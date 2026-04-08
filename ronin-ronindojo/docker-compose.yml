@@ -37,7 +37,8 @@ services:
     image: ghcr.io/skyman21m/dojo-tor:1.23.0
     restart: on-failure
     user: "0:0"
-    command: "/restart.sh"
+    command: >
+      bash -c "chmod -R 755 /var/lib/tor && /restart.sh"
     environment:
       COMMON_BTC_NETWORK: mainnet
       TOR_SOCKS_PORT: "9050"
@@ -78,6 +79,7 @@ services:
   node:
     image: ghcr.io/skyman21m/dojo-nodejs:1.28.2
     restart: on-failure
+    user: "0:0"
     depends_on:
       - db
     command: "/home/node/app/wait-for-it.sh db:3306 --timeout=720 --strict -- /home/node/app/restart.sh"
