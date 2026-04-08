@@ -1,0 +1,251 @@
+version: "3.7"
+
+services:
+  # ==========================================================
+  # APP_PROXY — Reverse proxy Umbrel (obligatoire)
+  # Gère l'authentification (mot de passe Umbrel) et le HTTPS
+  # Redirige le trafic vers nginx (le frontend de Dojo)
+  # ==========================================================
+  app_proxy:
+    environment:
+      APP_HOST: ronin-ronindojo_nginx_1
+      APP_PORT: 80
+
+  # ==========================================================
+  # DATABASE — MariaDB pour stocker les données indexées par Dojo
+  # (transactions, adresses suivies, etc.)
+  # ==========================================================
+  db:
+    image: samouraiwallet/dojo-db:1.7.0
+    restart: on-failure
+    stop_grace_period: 1m
+    environment:
+      MYSQL_ROOT_PASSWORD: ${APP_PASSWORD}
+      MYSQL_DATABASE: samourai-main
+      MYSQL_USER: samourai
+      MYSQL_PASSWORD: ${APP_PASSWORD}
+    volumes:
+      - ${APP_DATA_DIR}/data/mysql:/var/lib/mysql
+
+  # ==========================================================
+  # TOR — Services cachés .onion pour Dojo
+  # Permet la connexion privée via Tor
+  # NET_DOJO_TOR_IPV4=0.0.0.0 pour binder sur toutes les interfaces
+  # Les NET_*_IPV4 pour les autres services = noms Docker (routage)
+  # ==========================================================
+  tor:
+    image: samouraiwallet/dojo-tor:1.23.0
+    restart: on-failure
+    environment:
+      COMMON_BTC_NETWORK: mainnet
+      TOR_SOCKS_PORT: "9050"
+      TOR_USE_BRIDGES: "off"
+      TOR_BRIDGE_TYPE: obfs4
+      TOR_BRIDGE_1: ""
+      TOR_BRIDGE_2: ""
+      TOR_BRIDGE_3: ""
+      BITCOIND_INSTALL: "off"
+      BITCOIND_IP: ${APP_BITCOIN_NODE_IP}
+      BITCOIND_RPC_PORT: "8332"
+      INDEXER_INSTALL: "on"
+      INDEXER_TYPE: electrs
+      INDEXER_IP: electrs
+      INDEXER_RPC_PORT: "50001"
+      EXPLORER_INSTALL: "on"
+      SOROBAN_INSTALL: "on"
+      SOROBAN_PORT: "4242"
+      MEMPOOL_INSTALL: "off"
+      # Binding : Tor écoute sur toutes les interfaces de son container
+      NET_DOJO_TOR_IPV4: "0.0.0.0"
+      # Routage : pointe vers les autres containers par nom Docker
+      NET_DOJO_NODE_IPV4: node
+      NET_DOJO_NGINX_IPV4: nginx
+      NET_DOJO_INDEXER_IPV4: electrs
+      NET_DOJO_EXPLORER_IPV4: explorer
+      NET_DOJO_SOROBAN_IPV4: soroban
+      NET_DMZ_NGINX_IPV4: nginx
+    volumes:
+      - ${APP_DATA_DIR}/data/tor:/var/lib/tor
+
+  # ==========================================================
+  # NODE — Cœur de Dojo (Node.js)
+  # API backend pour Samourai Wallet, tracker de transactions,
+  # outil de maintenance (admin web)
+  # Se connecte au Bitcoin Node d'Umbrel via RPC
+  # ==========================================================
+  node:
+    image: samouraiwallet/dojo-nodejs:1.28.2
+    restart: on-failure
+    depends_on:
+      - db
+    command: "/home/node/app/wait-for-it.sh db:3306 --timeout=720 --strict -- /home/node/app/restart.sh"
+    environment:
+      COMMON_BTC_NETWORK: mainnet
+      # MySQL
+      MYSQL_DATABASE: samourai-main
+      MYSQL_USER: samourai
+      MYSQL_PASSWORD: ${APP_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${APP_PASSWORD}
+      # Bitcoin RPC — connecté au nœud Umbrel
+      BITCOIND_INSTALL: "off"
+      BITCOIND_IP: ${APP_BITCOIN_NODE_IP}
+      BITCOIND_RPC_PORT: "8332"
+      BITCOIND_RPC_USER: ${APP_BITCOIN_RPC_USER}
+      BITCOIND_RPC_PASSWORD: ${APP_BITCOIN_RPC_PASS}
+      BITCOIND_ZMQ_RAWTXS: "28333"
+      BITCOIND_ZMQ_BLK_HASH: "28334"
+      # Dojo API keys
+      NODE_API_KEY: ${APP_SEED}
+      NODE_ADMIN_KEY: ${APP_PASSWORD}
+      NODE_JWT_SECRET: ${APP_SEED}_jwt
+      NODE_ACTIVE_INDEXER: local_indexer
+      NODE_FEE_TYPE: ECONOMICAL
+      NODE_GAP_EXTERNAL: "100"
+      NODE_GAP_INTERNAL: "100"
+      NODE_ADDR_FILTER_THRESHOLD: "1000"
+      NODE_ADDR_DERIVATION_MIN_CHILD: "2"
+      NODE_ADDR_DERIVATION_MAX_CHILD: "2"
+      NODE_ADDR_DERIVATION_THRESHOLD: "10"
+      NODE_TXS_SCHED_MAX_ENTRIES: "10"
+      NODE_TXS_SCHED_MAX_DELTA_HEIGHT: "18"
+      NODE_JWT_ACCESS_EXPIRES: "900"
+      NODE_JWT_REFRESH_EXPIRES: "7200"
+      NODE_PREFIX_STATUS: status
+      NODE_PREFIX_SUPPORT: support
+      NODE_PREFIX_STATUS_PUSHTX: status
+      NODE_TRACKER_MEMPOOL_PERIOD: "10000"
+      NODE_TRACKER_UNCONF_TXS_PERIOD: "300000"
+      # PandoTx
+      NODE_PANDOTX_PUSH: "on"
+      NODE_PANDOTX_PROCESS: "on"
+      NODE_PANDOTX_FALLBACK_MODE: convenient
+      NODE_PANDOTX_NB_RETRIES: "2"
+      NODE_PANDOTX_PUSH_KEY_MAIN: "pandotx.mainnet.push"
+      NODE_PANDOTX_PUSH_KEY_TEST: "pandotx.testnet.push"
+      NODE_PANDOTX_RESULTS_KEY_MAIN: "pandotx.mainnet.results"
+      NODE_PANDOTX_RESULTS_KEY_TEST: "pandotx.testnet.results"
+      # Indexer
+      INDEXER_INSTALL: "on"
+      INDEXER_TYPE: electrs
+      INDEXER_IP: electrs
+      INDEXER_RPC_PORT: "50001"
+      INDEXER_BATCH_SUPPORT: inactive
+      INDEXER_PROTOCOL: tcp
+      # Explorer
+      EXPLORER_INSTALL: "on"
+      # Soroban
+      SOROBAN_INSTALL: "on"
+      SOROBAN_PORT: "4242"
+      # Réseau interne (routage vers les autres containers)
+      TOR_SOCKS_PORT: "9050"
+      NET_DOJO_TOR_IPV4: tor
+      NET_DOJO_MYSQL_IPV4: db
+      NET_DOJO_INDEXER_IPV4: electrs
+      NET_DOJO_SOROBAN_IPV4: soroban
+    volumes:
+      - ${APP_DATA_DIR}/data/tor:/var/lib/tor
+
+  # ==========================================================
+  # NGINX — Reverse proxy Dojo → interface admin + pairing wallet
+  # app_proxy d'Umbrel redirige vers ce service sur le port 80
+  # ==========================================================
+  nginx:
+    image: samouraiwallet/dojo-nginx:1.9.0
+    restart: on-failure
+    depends_on:
+      - node
+    command: "/wait-for node:8080 --timeout=720 -- nginx"
+    environment:
+      COMMON_BTC_NETWORK: mainnet
+      EXPLORER_INSTALL: "on"
+
+  # ==========================================================
+  # ELECTRS — Serveur Electrum léger
+  # Indexe les adresses/transactions de la blockchain
+  # Première indexation : plusieurs heures
+  # ==========================================================
+  electrs:
+    image: samouraiwallet/dojo-electrs:1.2.0
+    restart: on-failure
+    stop_grace_period: 1m
+    depends_on:
+      - tor
+    environment:
+      COMMON_BTC_NETWORK: mainnet
+      BITCOIND_IP: ${APP_BITCOIN_NODE_IP}
+      BITCOIND_RPC_PORT: "8332"
+      BITCOIND_RPC_USER: ${APP_BITCOIN_RPC_USER}
+      BITCOIND_RPC_PASSWORD: ${APP_BITCOIN_RPC_PASS}
+      # Binding : electrs écoute sur toutes les interfaces
+      NET_DOJO_INDEXER_IPV4: "0.0.0.0"
+      INDEXER_IP: "0.0.0.0"
+      INDEXER_RPC_PORT: "50001"
+      INDEXER_BATCH_SIZE: "10"
+      INDEXER_BLK_TXIDS_CACHE_SIZE_MB: "10"
+      INDEXER_TXID_LIMIT: "501"
+      # Routage vers Tor
+      NET_DOJO_TOR_IPV4: tor
+      TOR_SOCKS_PORT: "9050"
+    volumes:
+      - ${APP_DATA_DIR}/data/electrs:/home/electrs
+
+  # ==========================================================
+  # EXPLORER — Explorateur de blocs (btc-rpc-explorer)
+  # ==========================================================
+  explorer:
+    image: samouraiwallet/dojo-explorer:3.5.1
+    restart: on-failure
+    environment:
+      COMMON_BTC_NETWORK: mainnet
+      BITCOIND_IP: ${APP_BITCOIN_NODE_IP}
+      BITCOIND_RPC_PORT: "8332"
+      BITCOIND_RPC_USER: ${APP_BITCOIN_RPC_USER}
+      BITCOIND_RPC_PASSWORD: ${APP_BITCOIN_RPC_PASS}
+      EXPLORER_SLOW_DEVICE_MODE: "on"
+      NODE_ACTIVE_INDEXER: local_indexer
+      INDEXER_IP: electrs
+      INDEXER_RPC_PORT: "50001"
+      INDEXER_PROTOCOL: tcp
+      # Binding : explorer écoute sur toutes les interfaces
+      NET_DOJO_EXPLORER_IPV4: "0.0.0.0"
+
+  # ==========================================================
+  # SOROBAN — Réseau décentralisé PandoTx
+  # Broadcast de transactions P2P pour CoinJoin Whirlpool
+  # ==========================================================
+  soroban:
+    image: samouraiwallet/dojo-soroban:0.4.2
+    restart: on-failure
+    stop_grace_period: 1m
+    environment:
+      COMMON_BTC_NETWORK: mainnet
+      SOROBAN_INSTALL: "on"
+      SOROBAN_ANNOUNCE: "on"
+      SOROBAN_LOG_LEVEL: info
+      SOROBAN_PORT: "4242"
+      SOROBAN_ONION_FILE: /home/soroban/data/hostname
+      SOROBAN_DHT_SERVER_MODE: "off"
+      SOROBAN_DOMAIN_MAIN: soroban
+      SOROBAN_DOMAIN_TEST: soroban-test
+      SOROBAN_ANNOUNCE_KEY_MAIN: "soroban.cluster.mainnet.nodes"
+      SOROBAN_ANNOUNCE_KEY_TEST: "soroban.cluster.testnet.nodes"
+      SOROBAN_P2P_LISTEN_PORT: "1042"
+      SOROBAN_P2P_ROOM_MAIN: soroban-dojo
+      SOROBAN_P2P_ROOM_TEST: soroban-dojo-test
+      SOROBAN_P2P_LOWWATER: "16"
+      SOROBAN_P2P_HIGHWATER: "40"
+      SOROBAN_P2P_PEERSTORE_FILE: /home/soroban/data/peerstore
+      SOROBAN_GOSSIP_D: "10"
+      SOROBAN_GOSSIP_DLO: "8"
+      SOROBAN_GOSSIP_DHI: "20"
+      SOROBAN_GOSSIP_DOUT: "5"
+      SOROBAN_GOSSIP_DSCORE: "7"
+      SOROBAN_GOSSIP_DLAZY: "10"
+      SOROBAN_GOSSIP_PRUNE_PEERS: "40"
+      SOROBAN_GOSSIP_LIMIT: "40"
+      SOROBAN_IPC_CHILD_COUNT: "2"
+      SOROBAN_IPC_NATS_PORT: "4322"
+      # Binding : soroban écoute sur toutes les interfaces
+      NET_DOJO_SOROBAN_IPV4: "0.0.0.0"
+    volumes:
+      - ${APP_DATA_DIR}/data/soroban:/home/soroban/data

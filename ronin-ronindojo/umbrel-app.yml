@@ -1,0 +1,25 @@
+manifestVersion: 1.1
+id: ronin-ronindojo
+category: bitcoin
+name: RoninDojo
+version: "2.4.1"
+tagline: Samourai Dojo backend for your Umbrel node
+description: >-
+  Run Samourai Dojo on your Umbrel, connected to your existing Bitcoin node.
+  Dojo provides a private backend for Samourai Wallet with built-in Tor support,
+  an Electrum indexer (electrs) for address lookups, a block explorer,
+  and Soroban for decentralized transaction broadcasting.
+  All traffic is routed through Tor hidden services.
+developer: RoninDojo Community
+website: https://ronindojo.io
+dependencies:
+  - bitcoin
+repo: ""
+support: ""
+port: 8080
+gallery: []
+path: ""
+defaultUsername: admin
+defaultPassword: ""
+submitter: ""
+submission: ""
