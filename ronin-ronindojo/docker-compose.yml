@@ -36,6 +36,7 @@ services:
   tor:
     image: ghcr.io/skyman21m/dojo-tor:1.23.0
     restart: on-failure
+    command: "/restart.sh"
     environment:
       COMMON_BTC_NETWORK: mainnet
       TOR_SOCKS_PORT: "9050"
@@ -168,6 +169,7 @@ services:
     image: ghcr.io/skyman21m/dojo-electrs:1.2.0
     restart: on-failure
     stop_grace_period: 1m
+    command: "/restart.sh"
     depends_on:
       - tor
     environment:
@@ -195,6 +197,7 @@ services:
   explorer:
     image: ghcr.io/skyman21m/dojo-explorer:3.5.1
     restart: on-failure
+    command: "/home/node/app/restart.sh"
     environment:
       COMMON_BTC_NETWORK: mainnet
       BITCOIND_IP: ${APP_BITCOIN_NODE_IP}
