@@ -36,6 +36,7 @@ services:
   tor:
     image: ghcr.io/skyman21m/dojo-tor:1.23.0
     restart: on-failure
+    user: "0:0"
     command: "/restart.sh"
     environment:
       COMMON_BTC_NETWORK: mainnet
@@ -169,6 +170,7 @@ services:
     image: ghcr.io/skyman21m/dojo-electrs:1.2.0
     restart: on-failure
     stop_grace_period: 1m
+    user: "0:0"
     command: "/restart.sh"
     depends_on:
       - tor
