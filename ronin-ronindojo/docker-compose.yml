@@ -123,8 +123,8 @@ services:
       NODE_TRACKER_MEMPOOL_PERIOD: "10000"
       NODE_TRACKER_UNCONF_TXS_PERIOD: "300000"
       # PandoTx
-      NODE_PANDOTX_PUSH: "on"
-      NODE_PANDOTX_PROCESS: "on"
+      NODE_PANDOTX_PUSH: "off"
+      NODE_PANDOTX_PROCESS: "off"
       NODE_PANDOTX_FALLBACK_MODE: convenient
       NODE_PANDOTX_NB_RETRIES: "2"
       NODE_PANDOTX_PUSH_KEY_MAIN: "pandotx.mainnet.push"
