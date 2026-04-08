@@ -16,7 +16,7 @@ services:
   # (transactions, adresses suivies, etc.)
   # ==========================================================
   db:
-    image: samouraiwallet/dojo-db:1.7.0
+    image: ghcr.io/skyman21m/dojo-db:1.7.0
     restart: on-failure
     stop_grace_period: 1m
     environment:
@@ -34,7 +34,7 @@ services:
   # Les NET_*_IPV4 pour les autres services = noms Docker (routage)
   # ==========================================================
   tor:
-    image: samouraiwallet/dojo-tor:1.23.0
+    image: ghcr.io/skyman21m/dojo-tor:1.23.0
     restart: on-failure
     environment:
       COMMON_BTC_NETWORK: mainnet
@@ -74,7 +74,7 @@ services:
   # Se connecte au Bitcoin Node d'Umbrel via RPC
   # ==========================================================
   node:
-    image: samouraiwallet/dojo-nodejs:1.28.2
+    image: ghcr.io/skyman21m/dojo-nodejs:1.28.2
     restart: on-failure
     depends_on:
       - db
@@ -150,7 +150,7 @@ services:
   # app_proxy d'Umbrel redirige vers ce service sur le port 80
   # ==========================================================
   nginx:
-    image: samouraiwallet/dojo-nginx:1.9.0
+    image: ghcr.io/skyman21m/dojo-nginx:1.9.0
     restart: on-failure
     depends_on:
       - node
@@ -165,7 +165,7 @@ services:
   # Première indexation : plusieurs heures
   # ==========================================================
   electrs:
-    image: samouraiwallet/dojo-electrs:1.2.0
+    image: ghcr.io/skyman21m/dojo-electrs:1.2.0
     restart: on-failure
     stop_grace_period: 1m
     depends_on:
@@ -193,7 +193,7 @@ services:
   # EXPLORER — Explorateur de blocs (btc-rpc-explorer)
   # ==========================================================
   explorer:
-    image: samouraiwallet/dojo-explorer:3.5.1
+    image: ghcr.io/skyman21m/dojo-explorer:3.5.1
     restart: on-failure
     environment:
       COMMON_BTC_NETWORK: mainnet
@@ -214,7 +214,7 @@ services:
   # Broadcast de transactions P2P pour CoinJoin Whirlpool
   # ==========================================================
   soroban:
-    image: samouraiwallet/dojo-soroban:0.4.2
+    image: ghcr.io/skyman21m/dojo-soroban:0.4.2
     restart: on-failure
     stop_grace_period: 1m
     environment:
