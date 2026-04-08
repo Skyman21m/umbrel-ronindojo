@@ -187,6 +187,7 @@ services:
       BITCOIND_RPC_PORT: ${APP_BITCOIN_RPC_PORT}
       BITCOIND_RPC_USER: ${APP_BITCOIN_RPC_USER}
       BITCOIND_RPC_PASSWORD: ${APP_BITCOIN_RPC_PASS}
+      BITCOIND_P2P_PORT: ${APP_BITCOIN_P2P_PORT}
       # Binding : electrs écoute sur toutes les interfaces
       NET_DOJO_INDEXER_IPV4: "0.0.0.0"
       INDEXER_IP: "0.0.0.0"
