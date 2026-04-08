@@ -18,6 +18,7 @@ services:
   db:
     image: ghcr.io/skyman21m/dojo-db:1.7.0
     restart: on-failure
+    hostname: db
     stop_grace_period: 1m
     environment:
       MYSQL_ROOT_PASSWORD: ${APP_PASSWORD}
@@ -37,6 +38,7 @@ services:
     image: ghcr.io/skyman21m/dojo-tor:1.23.0
     restart: on-failure
     user: "0:0"
+    hostname: tor
     command: >
       bash -c "chmod -R 755 /var/lib/tor && /restart.sh"
     environment:
@@ -80,6 +82,7 @@ services:
     image: ghcr.io/skyman21m/dojo-nodejs:1.28.2
     restart: on-failure
     user: "0:0"
+    hostname: node
     depends_on:
       - db
     command: "/home/node/app/wait-for-it.sh db:3306 --timeout=720 --strict -- /home/node/app/restart.sh"
@@ -156,6 +159,7 @@ services:
   nginx:
     image: ghcr.io/skyman21m/dojo-nginx:1.9.0
     restart: on-failure
+    hostname: nginx
     depends_on:
       - node
     command: "/wait-for node:8080 --timeout=720 -- nginx"
@@ -173,6 +177,7 @@ services:
     restart: on-failure
     stop_grace_period: 1m
     user: "0:0"
+    hostname: electrs
     command: "/restart.sh"
     depends_on:
       - tor
@@ -201,6 +206,7 @@ services:
   explorer:
     image: ghcr.io/skyman21m/dojo-explorer:3.5.1
     restart: on-failure
+    hostname: explorer
     command: "/home/node/app/restart.sh"
     environment:
       COMMON_BTC_NETWORK: mainnet
@@ -223,6 +229,7 @@ services:
   soroban:
     image: ghcr.io/skyman21m/dojo-soroban:0.4.2
     restart: on-failure
+    hostname: soroban
     stop_grace_period: 1m
     environment:
       COMMON_BTC_NETWORK: mainnet
