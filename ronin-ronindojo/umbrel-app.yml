@@ -18,7 +18,7 @@ repo: ""
 support: ""
 port: 8099
 gallery: []
-path: ""
+path: "/admin"
 defaultUsername: admin
 defaultPassword: ""
 submitter: ""
