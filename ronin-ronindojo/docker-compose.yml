@@ -8,8 +8,8 @@ services:
   # ==========================================================
   app_proxy:
     environment:
-      APP_HOST: ronin-ronindojo_nginx_1
-      APP_PORT: 80
+      APP_HOST: ronin-ronindojo_ronin-ui_1
+      APP_PORT: 3000
 
   # ==========================================================
   # DATABASE — MariaDB pour stocker les données indexées par Dojo
@@ -267,3 +267,40 @@ services:
       NET_DOJO_SOROBAN_IPV4: soroban
     volumes:
       - ${APP_DATA_DIR}/data/soroban:/home/soroban/data
+
+  # ==========================================================
+  # RONIN-UI — Dashboard Next.js
+  # Interface graphique complète pour gérer Dojo
+  # Remplace le Maintenance Tool basique
+  # ==========================================================
+  ronin-ui:
+    image: ghcr.io/skyman21m/ronin-ui:2.6.0
+    restart: on-failure
+    user: "0:0"
+    hostname: ronin-ui
+    depends_on:
+      - node
+      - tor
+    environment:
+      NODE_ENV: production
+      JWT_SECRET: ${APP_SEED}_roninui_jwt_secret_pad
+      COOKIE_MAX_AGE: "7200"
+      NEXT_TELEMETRY_DISABLED: "1"
+      USE_REAL_DATA: "true"
+      RONIN_UI_USERNAME: umbrel
+      RONIN_UI_DATA_DIR: /app/data
+      # Dojo API
+      DOJO_API_URL: http://node:8080/v2/
+      NODE_API_KEY: ${APP_SEED}
+      NODE_ADMIN_KEY: ${APP_PASSWORD}
+      DOJO_VERSION_TAG: "1.28.2"
+      # Bitcoin RPC
+      BITCOIND_RPC_HOST: ${APP_BITCOIN_NODE_IP}
+      BITCOIND_RPC_PORT: ${APP_BITCOIN_RPC_PORT}
+      BITCOIND_RPC_USER: ${APP_BITCOIN_RPC_USER}
+      BITCOIND_RPC_PASSWORD: ${APP_BITCOIN_RPC_PASS}
+      # Docker container names for exec
+      DOCKER_TOR_CONTAINER: ronin-ronindojo_tor_1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${APP_DATA_DIR}/data/ronin-ui:/app/data

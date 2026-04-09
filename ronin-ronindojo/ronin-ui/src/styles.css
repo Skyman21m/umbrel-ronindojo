@@ -1,0 +1,125 @@
+@tailwind base; /* Preflight will be injected here */
+
+@tailwind components;
+
+@tailwind utilities;
+
+.sankey-node {
+    fill: theme("colors.border");
+    stroke-width: 1px;
+    stroke: theme("colors.secondary.DEFAULT");
+}
+
+@layer base {
+  #__next {
+    @apply h-full;
+  }
+
+  body {
+    background-color: #4e3d42;
+  }
+}
+
+@layer components {
+  .box {
+    @apply border border-primary p-8 relative before:content-[''] before:absolute before:top-6 before:left-0 before:transform before:z-10 before:-rotate-45 before:border-t-2 before:border-primary before:w-9 before:h-0 before:-translate-x-px before:-translate-y-px before:origin-left after:content-[''] after:absolute after:bottom-6 after:right-0 after:z-10 after:transform after:-rotate-45 after:border-b-2 after:border-primary after:w-9 after:h-0 after:translate-x-px after:translate-y-px after:origin-right;
+    clip-path: polygon(
+      theme("spacing.6") 0%,
+      100% 0,
+      100% calc(100% - theme("spacing.6")),
+      calc(100% - theme("spacing.6")) 100%,
+      0 100%,
+      0% theme("spacing.6")
+    );
+    box-shadow: 0 10px 15px #00000080;
+  }
+
+  .box.disabled {
+    @apply border-border before:border-border after:border-border;
+  }
+
+  .button {
+    @apply transition-colors text-center font-primary text-primary border border-primary rounded-full inline-block text-lg px-8 py-3 hover:text-white hover:drop-shadow-menuItem hover:border-primary-alpha;
+  }
+
+  .button.secondary {
+    @apply text-secondary border-secondary hover:text-white hover:border-secondary-alpha;
+  }
+
+  .button.small {
+    @apply px-4 py-1.5 text-sm;
+  }
+
+  .button.tiny {
+    @apply px-3 py-1 text-xs;
+  }
+
+  .button:disabled {
+    @apply text-gray-500 hover:text-gray-500 border-gray-500 hover:border-gray-500  drop-shadow-none;
+  }
+
+  .input-text {
+    @apply w-full rounded-3xl bg-border border-none text-paragraph font-mono disabled:cursor-not-allowed disabled:text-gray-500;
+  }
+
+  .progress {
+    background-image: repeating-linear-gradient(
+      to right,
+      theme("backgroundColor.primary.DEFAULT"),
+      theme("backgroundColor.primary.DEFAULT") 5px,
+      transparent 5px,
+      transparent 8px
+    );
+    background-position: 2px;
+  }
+
+  .table-rounded tbody tr:first-child td:first-child {
+    border-top-left-radius: 0.75rem;
+  }
+
+  .table-rounded tbody tr:first-child td:last-child {
+    border-top-right-radius: 0.75rem;
+  }
+
+  .table-rounded tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 0.75rem;
+  }
+
+  .table-rounded tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 0.75rem;
+  }
+
+  tr .toggle-show {
+    visibility: hidden;
+  }
+
+  tr:hover .toggle-show {
+    visibility: visible;
+  }
+
+  .pagination {
+    @apply h-10 w-10 transition-colors text-center text-primary font-primary hover:text-white disabled:text-gray-500 bg-black disabled:bg-surface;
+  }
+}
+
+@layer utilities {
+  .ellipsis::before,
+  .ellipsis::after {
+    display: inline-block;
+    max-width: 50%;
+    overflow: hidden;
+    white-space: pre;
+    vertical-align: top;
+  }
+
+  .ellipsis::before {
+    content: attr(data-content-start);
+    text-overflow: ellipsis;
+  }
+
+  .ellipsis::after {
+    content: attr(data-content-end);
+    text-overflow: "";
+    direction: rtl;
+  }
+}

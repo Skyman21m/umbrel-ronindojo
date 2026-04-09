@@ -1,0 +1,15 @@
+/.idea
+.env
+
+node_modules
+.next
+tsconfig.tsbuildinfo
+
+ronin-ui.dat
+ronin-ui*.tar.gz*
+
+yarn-error.log
+/logs/
+/.idea/
+
+.yarn/*
