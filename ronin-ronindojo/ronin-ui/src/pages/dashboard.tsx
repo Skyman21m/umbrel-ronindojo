@@ -101,6 +101,9 @@ const itemAnimationVariants: Variants = {
   },
 };
 
+const nameIncludes = (container: { Names: string[] }, pattern: string) =>
+  container.Names.some((n) => n.toLowerCase().includes(pattern));
+
 const getBlockTime = (blockHeader: BlockHeader): string => {
   const seconds = DateTime.utc().toSeconds() - blockHeader.time;
   const duration = Duration.fromObject({ seconds: seconds }).shiftTo("days", "hours", "minutes", "seconds", "milliseconds");
@@ -150,22 +153,26 @@ const DashboardPage: NextPage<Props> = ({
     fallbackData: containerInfo,
   });
 
-  const isDbRunning = Boolean(containerInfoData?.find((container) => container.Names.includes("/db"))?.State.toLowerCase() === "running");
-  const isNodejsRunning = Boolean(containerInfoData?.find((container) => container.Names.includes("/nodejs"))?.State.toLowerCase() === "running");
-  const isBitcoindRunning = Boolean(containerInfoData?.find((container) => container.Names.includes("/db"))?.State.toLowerCase() === "running");
+  const isDbRunning = Boolean(containerInfoData?.find((c) => nameIncludes(c, "db"))?.State.toLowerCase() === "running");
+  const isNodejsRunning = Boolean(containerInfoData?.find((c) => nameIncludes(c, "nodejs") || nameIncludes(c, "_node_") || nameIncludes(c, "_node-"))?.State.toLowerCase() === "running");
+  const isBitcoindRunning = true; // On Umbrel, Bitcoin is managed externally
   const isIndexerRunning = Boolean(
     containerInfoData
-      ?.find((container) => container.Names.includes("/indexer") || container.Names.includes("/electrs") || container.Names.includes("/fulcrum"))
+      ?.find((c) => nameIncludes(c, "indexer") || nameIncludes(c, "electrs") || nameIncludes(c, "fulcrum"))
       ?.State.toLowerCase() === "running",
   );
-  const isMempoolInstalled = containerInfoData ? containerInfoData.some((container) => container.Names.includes("/mempool_db")) : null;
-  const isMempoolRunning = Boolean(containerInfoData?.find((container) => container.Names.includes("/mempool_db"))?.State.toLowerCase() === "running");
+  const isMempoolInstalled = containerInfoData ? containerInfoData.some((c) => nameIncludes(c, "mempool_db") || nameIncludes(c, "mempool-db")) : null;
+  const isMempoolRunning = Boolean(containerInfoData?.find((c) => nameIncludes(c, "mempool_db") || nameIncludes(c, "mempool-db"))?.State.toLowerCase() === "running");
 
-  const isExplorerRunning = Boolean(containerInfoData?.find((container) => container.Names.includes("/explorer"))?.State.toLowerCase() === "running");
+  const isExplorerRunning = Boolean(containerInfoData?.find((c) => nameIncludes(c, "explorer"))?.State.toLowerCase() === "running");
 
   const { data: dojoStatusData } = useSWR<StatusResponse | null>(isNodejsRunning ? "/dojo/status" : null, {
-    refreshInterval: 30 * SECOND,
+    refreshInterval: 10 * SECOND,
     fallbackData: dojoStatus,
+    onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
+      if (retryCount >= 10) return;
+      setTimeout(() => revalidate({ retryCount }), 5 * SECOND);
+    },
   });
 
   const { data: cpuTempData } = useSWR<CPuTempResponse | null>("/system/cpu-temperature", { refreshInterval: 5 * SECOND, fallbackData: ssrTemperatureData });
@@ -236,7 +243,7 @@ const DashboardPage: NextPage<Props> = ({
   );
   const indexerProgress = Math.min(
     100,
-    blockchainInfoData && dojoStatusData ? Number(((100 / blockchainInfoData.blocks ?? 1) * dojoStatusData.indexer.maxHeight).toFixed(2)) : 0,
+    blockchainInfoData && dojoStatusData && dojoStatusData.indexer?.maxHeight != null ? Number(((100 / blockchainInfoData.blocks ?? 1) * dojoStatusData.indexer.maxHeight).toFixed(2)) : 0,
   );
 
   return (
@@ -488,9 +495,7 @@ const DashboardPage: NextPage<Props> = ({
               </motion.div>
             </>
           )}
-          <ContainerStatusIndicator
-            running={Boolean(containerInfoData?.find((container) => container.Names.includes("/bitcoind"))?.State.toLowerCase() === "running")}
-          />
+          <ContainerStatusIndicator running={isBitcoindRunning} />
           <ManageButton onClick={() => setShowBitcoindDialog(true)} />
         </motion.div>
 

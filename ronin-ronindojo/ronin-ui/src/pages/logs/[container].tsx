@@ -42,7 +42,7 @@ const LogsPage: NextPage<Props> = ({ layoutTitle, ssrDojoContainers, logs }) => 
   const filteredLogOptions = useMemo(
     () =>
       logOptions.filter(([containerLabel, containerName]) => {
-        return containerName === "pm2" || Boolean(ssrDojoContainers?.find((dockerContainer) => dockerContainer.Names.join("").includes(containerName)));
+        return Boolean(ssrDojoContainers?.find((dockerContainer) => dockerContainer.Names.join("").includes(containerName)));
       }),
     [logOptions, ssrDojoContainers],
   );

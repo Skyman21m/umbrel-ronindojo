@@ -40,7 +40,7 @@ services:
     user: "0:0"
     hostname: tor
     command: >
-      bash -c "chmod -R 755 /var/lib/tor && /restart.sh"
+      bash -c "chmod -R 700 /var/lib/tor && /restart.sh"
     environment:
       COMMON_BTC_NETWORK: mainnet
       TOR_SOCKS_PORT: "9050"
@@ -290,7 +290,7 @@ services:
       RONIN_UI_USERNAME: umbrel
       RONIN_UI_DATA_DIR: /app/data
       # Dojo API
-      DOJO_API_URL: http://node:8080/v2/
+      DOJO_API_URL: http://node:8080/
       NODE_API_KEY: ${APP_SEED}
       NODE_ADMIN_KEY: ${APP_PASSWORD}
       DOJO_VERSION_TAG: "1.28.2"

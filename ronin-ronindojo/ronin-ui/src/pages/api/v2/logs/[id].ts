@@ -6,7 +6,7 @@ import { pipe } from "fp-ts/function";
 import * as t from "io-ts";
 import { IntFromString } from "io-ts-types/IntFromString";
 
-import { ContainersCodec, demuxStream, getDockerode } from "../../../../lib/server/docker";
+import { ContainersCodec, demuxStream, getDockerode, findContainerByName } from "../../../../lib/server/docker";
 import { toBoomError } from "../../../../lib/server/to-boom-error";
 import { PM2_LOG_PATH } from "../../../../const";
 import { withV2Middlewares } from "../../../../middlewares/v2";
@@ -40,8 +40,8 @@ export const getLogs = ({ id, tail }: RequestParamsType): taskEither.TaskEither<
             ? readPM2Logs(tail)
             : pipe(
                 getDockerode,
-                io.map((dockerode) => dockerode.getContainer(id)),
                 taskEither.fromIO,
+                taskEither.chain((dockerode) => findContainerByName(dockerode, id)),
                 taskEither.chain((container) =>
                   pipe(
                     taskEither.tryCatch(

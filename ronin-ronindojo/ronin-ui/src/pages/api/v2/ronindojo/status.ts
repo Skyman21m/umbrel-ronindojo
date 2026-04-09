@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { either, taskEither, task, apply, option, readonlyArray as ROA } from "fp-ts";
-import { pipe, flow, constFalse } from "fp-ts/function";
+import { pipe, flow, constFalse, constTrue } from "fp-ts/function";
 
 import { withV2Middlewares } from "../../../../middlewares/v2";
 import { withSessionApi } from "../../../../lib/server/session";
@@ -85,7 +85,7 @@ const getRoninDojoServiceStatus: task.Task<RoninDojoStatus> = apply.sequenceS(ta
               either.map((dojoStatus) => blockchainInfo.blocks - 3 <= (dojoStatus?.blocks ?? 0)),
             ),
           ),
-          either.getOrElse(constFalse),
+          either.getOrElse(constTrue),
           task.of,
         ),
         indexerSynced: pipe(
@@ -96,7 +96,7 @@ const getRoninDojoServiceStatus: task.Task<RoninDojoStatus> = apply.sequenceS(ta
               either.map((dojoStatus) => blockchainInfo.blocks - 3 <= (dojoStatus?.indexer?.maxHeight ?? 0)),
             ),
           ),
-          either.getOrElse(constFalse),
+          either.getOrElse(constTrue),
           task.of,
         ),
       }),

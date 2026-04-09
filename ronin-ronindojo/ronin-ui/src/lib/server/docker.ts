@@ -56,7 +56,7 @@ export const demuxStream =
   };
 
 // Find a container by matching a pattern in its name
-const findContainerByName = (dockerode: Dockerode, pattern: string): taskEither.TaskEither<Boom, Dockerode.Container> =>
+export const findContainerByName = (dockerode: Dockerode, pattern: string): taskEither.TaskEither<Boom, Dockerode.Container> =>
   pipe(
     taskEither.tryCatch(() => dockerode.listContainers({ all: true }), toBoomError(503)),
     taskEither.chain((containers) => {
@@ -160,6 +160,8 @@ export const getDojoImageBuildStatus: taskEither.TaskEither<Boom, DojoImageBuild
               ),
             ),
           ),
+          // On Umbrel, Bitcoin is managed externally — always mark it as ready
+          (status) => ({ ...status, bitcoind: "ready" as DojoImageStatus }),
         ),
       ),
     )
