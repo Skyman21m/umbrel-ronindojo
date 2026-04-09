@@ -85,6 +85,12 @@ services:
     hostname: node
     depends_on:
       - db
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8080/v2/',r=>{process.exit(r.statusCode===200||r.statusCode===404?0:1)}).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
     command: "/home/node/app/wait-for-it.sh db:3306 --timeout=720 --strict -- /home/node/app/restart.sh"
     environment:
       COMMON_BTC_NETWORK: mainnet
@@ -162,7 +168,8 @@ services:
     restart: on-failure
     hostname: nginx
     depends_on:
-      - node
+      node:
+        condition: service_healthy
     command: "/wait-for node:8080 --timeout=720 -- nginx"
     environment:
       COMMON_BTC_NETWORK: mainnet
