@@ -10,6 +10,7 @@ description: >-
   an Electrum indexer (electrs) for address lookups, a block explorer,
   and Soroban for decentralized transaction broadcasting.
   All traffic is routed through Tor hidden services.
+icon: https://raw.githubusercontent.com/Skyman21m/umbrel-ronindojo/main/ronin-ronindojo/icon.png
 developer: RoninDojo Community
 website: https://ronindojo.io
 dependencies:

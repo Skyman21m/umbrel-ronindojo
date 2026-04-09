@@ -88,6 +88,7 @@ services:
     command: "/home/node/app/wait-for-it.sh db:3306 --timeout=720 --strict -- /home/node/app/restart.sh"
     environment:
       COMMON_BTC_NETWORK: mainnet
+      DOJO_VERSION_TAG: "1.28.2"
       # MySQL
       MYSQL_DATABASE: samourai-main
       MYSQL_USER: samourai
