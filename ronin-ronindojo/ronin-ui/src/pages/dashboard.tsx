@@ -167,12 +167,8 @@ const DashboardPage: NextPage<Props> = ({
   const isExplorerRunning = Boolean(containerInfoData?.find((c) => nameIncludes(c, "explorer"))?.State.toLowerCase() === "running");
 
   const { data: dojoStatusData } = useSWR<StatusResponse | null>(isNodejsRunning ? "/dojo/status" : null, {
-    refreshInterval: 10 * SECOND,
+    refreshInterval: 30 * SECOND,
     fallbackData: dojoStatus,
-    onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
-      if (retryCount >= 10) return;
-      setTimeout(() => revalidate({ retryCount }), 5 * SECOND);
-    },
   });
 
   const { data: cpuTempData } = useSWR<CPuTempResponse | null>("/system/cpu-temperature", { refreshInterval: 5 * SECOND, fallbackData: ssrTemperatureData });
@@ -243,7 +239,7 @@ const DashboardPage: NextPage<Props> = ({
   );
   const indexerProgress = Math.min(
     100,
-    blockchainInfoData && dojoStatusData && dojoStatusData.indexer?.maxHeight != null ? Number(((100 / blockchainInfoData.blocks ?? 1) * dojoStatusData.indexer.maxHeight).toFixed(2)) : 0,
+    blockchainInfoData && dojoStatusData ? Number(((100 / blockchainInfoData.blocks ?? 1) * dojoStatusData.indexer.maxHeight).toFixed(2)) : 0,
   );
 
   return (

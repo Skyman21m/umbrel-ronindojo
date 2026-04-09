@@ -29,19 +29,11 @@ const mockData: StatusResponse = {
 
 const methods = "GET";
 
-let cachedDojoStatus: StatusResponse | null = null;
-
 export const getDojoStatus = pipe(
   useRealData
     ? pipe(
         dojoStatus,
-        taskEither.map((statusResponse) => {
-          cachedDojoStatus = statusResponse.data;
-          return statusResponse.data;
-        }),
-        taskEither.orElse((err) =>
-          cachedDojoStatus ? taskEither.right(cachedDojoStatus) : taskEither.left(err),
-        ),
+        taskEither.map((statusResponse) => statusResponse.data),
       )
     : pipe(taskEither.right(mockData), task.delay(2000)),
 );
