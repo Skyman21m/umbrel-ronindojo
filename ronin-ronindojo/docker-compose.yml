@@ -163,7 +163,6 @@ services:
     hostname: nginx
     depends_on:
       - node
-    command: "/wait-for node:8080 --timeout=720 -- nginx"
     environment:
       COMMON_BTC_NETWORK: mainnet
       EXPLORER_INSTALL: "on"
