@@ -10,6 +10,11 @@ description: >-
   an Electrum indexer (electrs) for address lookups, a block explorer,
   and Soroban for decentralized transaction broadcasting.
   All traffic is routed through Tor hidden services.
+
+
+  After installation, please wait 2-3 minutes for all services to start
+  before opening the app. The Admin Key shown below is your login password
+  for the Dojo Maintenance Tool.
 icon: https://raw.githubusercontent.com/Skyman21m/umbrel-ronindojo/main/ronin-ronindojo/icon.png
 developer: RoninDojo Community
 website: https://ronindojo.io
@@ -20,7 +25,8 @@ support: ""
 port: 8099
 gallery: []
 path: ""
-defaultUsername: admin
+defaultUsername: ""
 defaultPassword: ""
+deterministicPassword: true
 submitter: ""
 submission: ""
