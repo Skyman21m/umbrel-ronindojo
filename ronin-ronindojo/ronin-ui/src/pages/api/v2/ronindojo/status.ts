@@ -34,23 +34,15 @@ const getRoninDojoServiceStatus: task.Task<RoninDojoStatus> = apply.sequenceS(ta
     listContainers,
     task.chain((containersEither) =>
       apply.sequenceS(task.ApplyPar)({
-        bitcoindRunning: pipe(
-          containersEither,
-          either.map(
-            flow(
-              ROA.findFirst((container) => container.Names.join("").includes("bitcoind")),
-              option.map((container) => container.State.toLowerCase() === "running"),
-              option.getOrElse(constFalse),
-            ),
-          ),
-          either.getOrElse(constFalse),
-          task.of,
-        ),
+        // On Umbrel, Bitcoin is managed externally — always consider it running
+        bitcoindRunning: task.of(true),
         nodejsRunning: pipe(
           containersEither,
           either.map(
             flow(
-              ROA.findFirst((container) => container.Names.join("").includes("nodejs")),
+              ROA.findFirst((container) =>
+                container.Names.join("").includes("nodejs") || container.Names.join("").includes("_node_"),
+              ),
               option.map((container) => container.State.toLowerCase() === "running"),
               option.getOrElse(constFalse),
             ),
