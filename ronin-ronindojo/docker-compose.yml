@@ -241,7 +241,7 @@ services:
       SOROBAN_LOG_LEVEL: info
       SOROBAN_PORT: "4242"
       SOROBAN_ONION_FILE: /home/soroban/data/hostname
-      SOROBAN_DHT_SERVER_MODE: "off"
+      SOROBAN_DHT_SERVER_MODE: "on"
       SOROBAN_DOMAIN_MAIN: soroban
       SOROBAN_DOMAIN_TEST: soroban-test
       SOROBAN_ANNOUNCE_KEY_MAIN: "soroban.cluster.mainnet.nodes"
