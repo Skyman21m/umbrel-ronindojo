@@ -301,6 +301,9 @@ services:
       BITCOIND_RPC_PASSWORD: ${APP_BITCOIN_RPC_PASS}
       # Docker container names for exec
       DOCKER_TOR_CONTAINER: ronin-ronindojo_tor_1
+      # Conf files for settings page (persisted in data volume)
+      NODE_CONFIG_PATH: /app/data/docker-node.conf
+      BITCOIND_CONFIG_PATH: /app/data/docker-bitcoind.conf
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${APP_DATA_DIR}/data/ronin-ui:/app/data

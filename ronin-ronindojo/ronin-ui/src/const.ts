@@ -10,9 +10,9 @@ const TMP_DIR = tmpdir();
 
 export const DOJO_DIR_PATH = path.join(HOME_DIR, "dojo", "docker", "my-dojo");
 export const DOJO_EXEC_PATH = path.join(DOJO_DIR_PATH, "dojo.sh");
-export const NODE_CONFIG_PATH = path.join(DOJO_DIR_PATH, "conf", "docker-node.conf");
-export const BITCOIND_CONFIG_PATH = path.join(DOJO_DIR_PATH, "conf", "docker-bitcoind.conf");
-export const EXPLORER_CONFIG_PATH = path.join(DOJO_DIR_PATH, "conf", "docker-explorer.conf");
+export const NODE_CONFIG_PATH = process.env.NODE_CONFIG_PATH || path.join(DOJO_DIR_PATH, "conf", "docker-node.conf");
+export const BITCOIND_CONFIG_PATH = process.env.BITCOIND_CONFIG_PATH || path.join(DOJO_DIR_PATH, "conf", "docker-bitcoind.conf");
+export const EXPLORER_CONFIG_PATH = process.env.EXPLORER_CONFIG_PATH || path.join(DOJO_DIR_PATH, "conf", "docker-explorer.conf");
 export const DOJO_ENV_PATH = path.join(DOJO_DIR_PATH, ".env");
 export const PM2_LOG_PATH = path.join(process.cwd(), "logs", "combined.log");
 export const RONIN_UI_DATA_FILE = path.join(process.cwd(), "ronin-ui.dat");
