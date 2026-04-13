@@ -230,6 +230,7 @@ git push origin main
 | Tor en restart loop | `chmod 755` au lieu de `700` sur les hidden services | Fix appliqué dans docker-compose |
 | Barres de progression à 0% | `DOJO_API_URL` avec `/v2/` en trop | Fix appliqué dans docker-compose |
 | Logs ne marchent pas | `getContainer(id)` cherche nom exact, Umbrel préfixe les noms | Fix appliqué : `findContainerByName()` avec pattern matching |
+| Push TX → erreur 404 | `/pushtx/` n'est exposé que via nginx, pas sur `node:8080` direct | Fix appliqué : `pushTxApi` pointe vers `http://nginx/v2/` avec token en query param |
 | Page 404 après vidage navigateur | Cookie de session corrompu | Vider toutes les données du site `192.168.1.30` dans le navigateur |
 | `docker: permission denied` | Groupe docker non actif dans la session | Utiliser `sg docker -c "..."` |
 
