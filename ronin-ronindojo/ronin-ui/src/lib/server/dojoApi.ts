@@ -337,6 +337,9 @@ export type XpubImportStatusResponse = XpubImportStatusFalse | XpubImportStatusT
 
 const dojoApi: AxiosInstance = axios.create({ baseURL: process.env.DOJO_API_URL || "http://172.29.1.3/v2/", timeout: 30 * SECOND, httpAgent: new http.Agent({ keepAlive: true }) });
 
+// PushTx must go through nginx (not directly to node) as /pushtx/ is only exposed via nginx
+const pushTxApi: AxiosInstance = axios.create({ baseURL: process.env.PUSHTX_URL || "http://nginx/v2/", timeout: 30 * SECOND, httpAgent: new http.Agent({ keepAlive: true }) });
+
 let accessToken: string | null = null;
 
 // Function that will be called to refresh authorization
@@ -413,20 +416,25 @@ const logInDojo = pipe(
  */
 export const pushTx = (txHex: HexString): taskEither.TaskEither<Boom, AxiosResponse<PushTxResponse>> =>
   pipe(
-    taskEither.tryCatch(
-      () =>
-        dojoApi.post<string, AxiosResponse<PushTxResponse>>(DOJO_API.PUSHTX.POST.PUSHTX, new URLSearchParams({ tx: txHex }), {
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
+    accessToken ? taskEither.right(accessToken) : pipe(logInDojo, taskEither.map(({ data }) => { accessToken = data.authorizations.access_token; return accessToken as string; })),
+    taskEither.chain((token) =>
+      pipe(
+        taskEither.tryCatch(
+          () =>
+            pushTxApi.post<string, AxiosResponse<PushTxResponse>>(`${DOJO_API.PUSHTX.POST.PUSHTX}?at=${token}`, new URLSearchParams({ tx: txHex }), {
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+            }),
+          (e) => {
+            console.error("pushtx error", e);
+            return e as AxiosError<PushTxErrorResponse>;
           },
-        }),
-      (e) => {
-        console.error("pushtx error", e);
-        return e as AxiosError<PushTxErrorResponse>;
-      },
-    ),
-    taskEither.mapLeft((e) =>
-      serverUnavailable(typeof e.response?.data?.error === "string" ? e.response?.data?.error : e.response?.data?.error?.message || e.message),
+        ),
+        taskEither.mapLeft((e) =>
+          serverUnavailable(typeof e.response?.data?.error === "string" ? e.response?.data?.error : e.response?.data?.error?.message || e.message),
+        ),
+      ),
     ),
   );
 
