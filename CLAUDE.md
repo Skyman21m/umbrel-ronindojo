@@ -32,7 +32,7 @@ umbrel-ronindojo/
 ├── umbrel-app-store.yml             ← config du community app store Umbrel
 └── ronin-ronindojo/                 ← l'app (ID = [store-id]-[app-id])
     ├── umbrel-app.yml               ← fiche de l'app pour le store Umbrel
-    ├── docker-compose.yml           ← 8 services (voir ci-dessous)
+    ├── docker-compose.yml           ← 11 services (voir ci-dessous)
     ├── exports.sh                   ← déclaration du port
     ├── icon.png                     ← icône de l'app
     └── ronin-ui/                    ← code source Ronin-UI (Next.js)
@@ -58,9 +58,12 @@ umbrel-ronindojo/
 | `electrs` | `ghcr.io/skyman21m/dojo-electrs:1.2.0` | Indexeur Electrum (Electrs) |
 | `explorer` | `ghcr.io/skyman21m/dojo-explorer:3.5.1` | BTC-RPC Explorer |
 | `soroban` | `ghcr.io/skyman21m/dojo-soroban:0.4.2` | Réseau P2P PandoTx / CoinJoin |
+| `mempool_db` | `mariadb:10.5.8` | MariaDB — base de données Mempool Space |
+| `mempool_api` | `mempool/backend:v2.4.0` | API backend Mempool Space |
+| `mempool_web` | `mempool/frontend:v2.4.0` | Frontend web Mempool Space |
 | `ronin-ui` | `ghcr.io/skyman21m/ronin-ui:2.6.0` | Dashboard Next.js (interface graphique) |
 
-Toutes les images sont **publiques** sur `ghcr.io/skyman21m/`.
+Toutes les images custom sont **publiques** sur `ghcr.io/skyman21m/`. Les images Mempool sont les images officielles `mempool/*` de Docker Hub.
 
 ---
 
@@ -144,11 +147,13 @@ APP_BITCOIN_P2P_PORT  ← port P2P Bitcoin
 ### Données persistées (volumes)
 ```
 /home/umbrel/umbrel/app-data/ronin-ronindojo/data/
-├── mysql/       ← base de données Dojo (transactions, xpubs trackés)
-├── tor/         ← clés hidden services .onion (perdues si désinstallation)
-├── electrs/     ← index Electrs (plusieurs heures à reconstruire)
-├── soroban/     ← peerstore Soroban
-└── ronin-ui/    ← données session Ronin-UI
+├── mysql/        ← base de données Dojo (transactions, xpubs trackés)
+├── tor/          ← clés hidden services .onion (perdues si désinstallation)
+├── electrs/      ← index Electrs (plusieurs heures à reconstruire)
+├── soroban/      ← peerstore Soroban
+├── ronin-ui/     ← données session Ronin-UI + fichiers conf Settings
+├── mempool-db/   ← base de données Mempool Space
+└── mempool-api/  ← cache Mempool Space
 ```
 **La désinstallation supprime ces volumes** — Electrs et Dojo doivent resynchroniser depuis zéro (plusieurs heures).
 
@@ -233,20 +238,23 @@ git push origin main
 | Push TX → erreur 404 | `/pushtx/` n'est exposé que via nginx, pas sur `node:8080` direct | Fix appliqué : `pushTxApi` pointe vers `http://nginx/v2/` avec token en query param |
 | Page 404 après vidage navigateur | Cookie de session corrompu | Vider toutes les données du site `192.168.1.30` dans le navigateur |
 | `docker: permission denied` | Groupe docker non actif dans la session | Utiliser `sg docker -c "..."` |
+| Settings : boutons ne répondent pas | Fichiers conf absents sur Umbrel | Fix appliqué : `entrypoint.sh` crée les fichiers dans `/app/data/` |
+| Mempool Space "Not installed" | Scripts shell RoninOS absents sur Umbrel | Fix appliqué : 3 services Mempool intégrés dans docker-compose |
+| Container names mismatch après update docker-compose | Docker Compose v2 utilise des tirets au lieu d'underscores | Fix appliqué : `APP_HOST` et `DOCKER_TOR_CONTAINER` mis à jour avec tirets |
 
 ---
 
 ## État actuel (2026-04-14)
 
 - App fonctionnelle sur Umbrel Home
-- Tous les services running (node, nginx, db, tor, electrs, explorer, soroban, ronin-ui)
+- Tous les services running (node, nginx, db, tor, electrs, explorer, soroban, ronin-ui, mempool_db, mempool_api, mempool_web)
 - Dashboard Ronin-UI complet : Dojo 100%, Bitcoin Core 100%, Indexer 100%
 - Recommended fees OK, uptime Dojo OK, derniers blocs OK
 - Logs fonctionnels
 - Push TX fonctionnel via fallback RPC (Bitcoin Knots local)
 - Settings page : boutons fonctionnels (fix entrypoint.sh + conf files dans /app/data/)
+- Mempool Space : intégré et running, URL .onion générée par Tor via `MEMPOOL_INSTALL: "on"` + `NET_MEMPOOL_WEB_IPV4: mempool_web`
 - Soroban/PandoTX : démarre et Tor bootstrappe à 100%, mais ne trouve aucun pair — PandoTX échoue systématiquement avec "No available Soroban node found", fallback RPC utilisé à la place
-- URL .onion BTC-RPC Explorer générée par Tor mais affichage dans UI à vérifier
 
 ---
 
@@ -292,3 +300,67 @@ NODE_PANDOTX_PROCESS: "on"
 NODE_PANDOTX_FALLBACK_MODE: convenient
 NODE_PANDOTX_NB_RETRIES: "2"
 ```
+
+---
+
+## Mempool Space — Intégration
+
+Sur RoninOS, Mempool Space est un composant optionnel installé via des scripts shell (`_mempool_conf` dans `functions.sh`). Ces scripts n'existent pas sur Umbrel, et le dialog d'installation dans Ronin-UI demandait un mot de passe `sudo` Linux qui n'a pas de sens sur Umbrel.
+
+**Fix : intégration directe dans docker-compose.yml** (pas de scripts shell, pas de sudo)
+
+3 services ajoutés, basés sur le fichier `overrides/mempool.install.yaml` du repo source Dojo :
+- `mempool_db` — MariaDB 10.5.8 (base de données dédiée à Mempool)
+- `mempool_api` — `mempool/backend:v2.4.0` (connecté à Bitcoin RPC + Electrs + mempool_db)
+- `mempool_web` — `mempool/frontend:v2.4.0` (frontend web)
+
+**Config Tor :**
+- `MEMPOOL_INSTALL: "on"` dans le service `tor` → active la génération du hidden service
+- `NET_MEMPOOL_WEB_IPV4: mempool_web` → le script `restart.sh` de Tor crée `/var/lib/tor/hsv3mempool/` avec le hostname .onion
+- Ronin-UI lit l'URL .onion via `execAndGetResultFromTor({ Cmd: ["cat", "/var/lib/tor/hsv3mempool/hostname"] })`
+
+**Détection automatique par Ronin-UI :**
+- Le dashboard cherche un container nommé `mempool_db` ou `mempool-db` via le Docker socket
+- Si trouvé → affiche "Running" + lien .onion
+- Si absent → affiche "Not installed"
+
+**Source des versions :**
+- Versions trouvées dans `/home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/.env` :
+  - `MEMPOOL_API_VERSION_TAG=2.4.0`
+  - `MEMPOOL_WEB_VERSION_TAG=2.4.0`
+  - `MEMPOOL_DB_VERSION_TAG=10.5.8`
+
+**Limitation restante :**
+Les boutons install/uninstall dans le dialog Mempool de Ronin-UI ne sont pas fonctionnels (ils appellent des scripts shell RoninOS absents). Mais puisque Mempool est désormais permanent dans le docker-compose, ces boutons sont inutiles. Un fix cosmétique serait de les masquer.
+
+---
+
+## Nommage des containers Docker — Attention
+
+Docker Compose v1 (`docker-compose`) nomme les containers avec **underscores** : `ronin-ronindojo_ronin-ui_1`
+Docker Compose v2 (`docker compose`) nomme avec **tirets** : `ronin-ronindojo-ronin-ui-1`
+
+Umbrel utilise Docker Compose v2. Les références aux noms de containers dans notre config doivent utiliser le format tirets :
+- `APP_HOST: ronin-ronindojo-ronin-ui-1` (pas `_ronin-ui_1`)
+- `DOCKER_TOR_CONTAINER: ronin-ronindojo-tor-1` (pas `_tor_1`)
+
+**Piège :** si on met à jour le docker-compose local sur l'Umbrel (via `curl` depuis GitHub) puis restart, les containers sont recréés avec les nouveaux noms. L'`app_proxy` doit pointer vers le bon nom sinon l'app est inaccessible.
+
+---
+
+## Appliquer des changements docker-compose sans réinstaller
+
+Pour tester des changements de docker-compose sans perdre les volumes (réinstallation) :
+```bash
+# 1. Télécharger le nouveau docker-compose depuis GitHub
+sudo curl -s https://raw.githubusercontent.com/Skyman21m/umbrel-ronindojo/main/ronin-ronindojo/docker-compose.yml -o /home/umbrel/umbrel/app-data/ronin-ronindojo/docker-compose.yml
+
+# 2. Restart l'app depuis l'interface Umbrel
+```
+Cette méthode recrée tous les containers avec les nouvelles variables/services tout en préservant les volumes de données.
+
+**Chemin du docker-compose sur l'Umbrel :**
+- Fichier actif : `/home/umbrel/umbrel/app-data/ronin-ronindojo/docker-compose.yml`
+- Cache app store : `/home/umbrel/umbrel/app-stores/skyman21m-umbrel-ronindojo-github-*/ronin-ronindojo/docker-compose.yml`
+
+**Note :** `docker restart` ne relit PAS les env vars — seul un restart via Umbrel ou `docker compose up -d --force-recreate` applique les changements.
