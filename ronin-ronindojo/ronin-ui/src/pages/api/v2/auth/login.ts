@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { unauthorized } from "@hapi/boom";
-import { taskEither, either, json, string, boolean } from "fp-ts";
+import { taskEither, either, json, string } from "fp-ts";
 import { pipe } from "fp-ts/function";
 import * as t from "io-ts";
 import { NonEmptyString } from "io-ts-types/NonEmptyString";
@@ -13,7 +13,6 @@ import { withV2Middlewares } from "../../../../middlewares/v2";
 import { toBoomError } from "../../../../lib/server/to-boom-error";
 import { readDataFile, writeDataFile } from "../../../../lib/server/dataFile";
 import { decryptString } from "../../../../lib/server/decryptString";
-import { useRealData } from "../../../../lib/common";
 import { RONIN_UI_DATA_FILE } from "../../../../const";
 import { promises as fs } from "fs";
 
@@ -39,16 +38,12 @@ const handler = (req: NextApiRequest, res: NextApiResponse<Response | ErrorRespo
     taskEither.fromEither,
     taskEither.chain((parsedCredentials) =>
       pipe(
-        // Read password from ronin-ui.dat, fall back to NODE_ADMIN_KEY
+        // Read password from ronin-ui.dat
         taskEither.tryCatch(
           async () => {
-            try {
-              const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
-              const parsed = JSON.parse(data);
-              return parsed.password || process.env.NODE_ADMIN_KEY || "";
-            } catch {
-              return process.env.NODE_ADMIN_KEY || "";
-            }
+            const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
+            const parsed = JSON.parse(data);
+            return parsed.password || "";
           },
           toBoomError(500),
         ),

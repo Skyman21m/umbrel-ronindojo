@@ -20,7 +20,7 @@ import { encryptString } from "../lib/client/encryptString";
 
 type Props = InferGetServerSidePropsType<typeof getServerSideProps>;
 
-const SignIn: NextPage<Props> = ({ reinitialize, defaultPassword }) => {
+const SignIn: NextPage<Props> = ({ reinitialize }) => {
   const router = useRouter();
   const {
     register,
@@ -87,8 +87,7 @@ const SignIn: NextPage<Props> = ({ reinitialize, defaultPassword }) => {
             Sign In {(isSubmitting || isRouteChanging) && <CircularLoader className="h-6 w-6" color="primary" />}
           </button>
         </div>
-        {defaultPassword && <div className="w-full lg:w-96 mx-auto bg-border text-secondary p-4 rounded mb-8">Default password: <span className="text-white font-mono select-all">{defaultPassword}</span><br /><span className="text-paragraph text-sm">You can change this in Settings after login.</span></div>}
-        {reinitialize && !defaultPassword && <div className="w-full lg:w-96 mx-auto bg-border text-secondary p-4 rounded mb-8">Use your SSH password to log into RoninDojo</div>}
+        {reinitialize && <div className="w-full lg:w-96 mx-auto bg-border text-secondary p-4 rounded mb-8">Use the default password from Umbrel app settings to log in. You can change it in Settings after login.</div>}
       </form>
 
       <ErrorMessage errors={[error, errors.password?.type === "required" ? "Password is required" : null]} />
@@ -105,7 +104,6 @@ const SignIn: NextPage<Props> = ({ reinitialize, defaultPassword }) => {
 
 type SsrProps = PageProps<{
   reinitialize: boolean;
-  defaultPassword: string | null;
 }>;
 
 export const getServerSideProps = withSessionSsr<SsrProps>(async (ctx: GetServerSidePropsContext) => {
@@ -115,11 +113,11 @@ export const getServerSideProps = withSessionSsr<SsrProps>(async (ctx: GetServer
     return serverSideProps;
   }
 
-  const dataFileResult = await pipe(
+  const isDataFileValid = await pipe(
     readDataFile,
     taskEither.match(
-      () => null,
-      (data) => data,
+      () => false,
+      () => true,
     ),
   )();
 
@@ -127,8 +125,7 @@ export const getServerSideProps = withSessionSsr<SsrProps>(async (ctx: GetServer
     ...serverSideProps,
     props: {
       withLayout: false,
-      reinitialize: !dataFileResult,
-      defaultPassword: dataFileResult?.password ?? null,
+      reinitialize: !isDataFileValid,
     },
   };
 });

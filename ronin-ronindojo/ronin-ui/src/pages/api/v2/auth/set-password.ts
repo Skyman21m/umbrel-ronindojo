@@ -50,16 +50,10 @@ const handler = (req: NextApiRequest, res: NextApiResponse<Response | ErrorRespo
       pipe(
         taskEither.tryCatch(
           async () => {
-            try {
-              const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
-              const parsed = JSON.parse(data);
-              const storedPassword = parsed.password || process.env.NODE_ADMIN_KEY || "";
-              if (oldPassword !== storedPassword) throw new Error("Old password does not match");
-            } catch (error: any) {
-              if (error.message === "Old password does not match") throw error;
-              // File doesn't exist yet or unreadable — accept NODE_ADMIN_KEY as old password
-              if (oldPassword !== (process.env.NODE_ADMIN_KEY || "")) throw new Error("Old password does not match");
-            }
+            const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
+            const parsed = JSON.parse(data);
+            const storedPassword = parsed.password || "";
+            if (oldPassword !== storedPassword) throw new Error("Old password does not match");
           },
           () => badRequest("Old password does not match"),
         ),
