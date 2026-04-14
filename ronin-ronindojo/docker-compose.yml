@@ -72,6 +72,7 @@ services:
       NET_DMZ_NGINX_IPV4: nginx
     volumes:
       - ${APP_DATA_DIR}/data/tor:/var/lib/tor
+      - ${APP_DATA_DIR}/tor-restart.sh:/restart.sh:ro
 
   # ==========================================================
   # NODE — Cœur de Dojo (Node.js)
