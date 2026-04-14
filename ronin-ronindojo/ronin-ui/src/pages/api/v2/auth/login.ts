@@ -38,12 +38,15 @@ const handler = (req: NextApiRequest, res: NextApiResponse<Response | ErrorRespo
     taskEither.fromEither,
     taskEither.chain((parsedCredentials) =>
       pipe(
-        // Read password from ronin-ui.dat
+        // Try ronin-ui.dat first, then APP_PASSWORD env var
         taskEither.tryCatch(
           async () => {
-            const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
-            const parsed = JSON.parse(data);
-            return parsed.password || "";
+            try {
+              const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
+              const parsed = JSON.parse(data);
+              if (parsed.password) return parsed.password;
+            } catch {}
+            return process.env.APP_PASSWORD || process.env.NODE_ADMIN_KEY || "";
           },
           toBoomError(500),
         ),
