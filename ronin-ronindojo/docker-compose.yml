@@ -59,7 +59,8 @@ services:
       EXPLORER_INSTALL: "on"
       SOROBAN_INSTALL: "on"
       SOROBAN_PORT: "4242"
-      MEMPOOL_INSTALL: "off"
+      MEMPOOL_INSTALL: "on"
+      NET_MEMPOOL_WEB_IPV4: mempool_web
       # Binding : Tor écoute sur toutes les interfaces de son container
       NET_DOJO_TOR_IPV4: "0.0.0.0"
       # Routage : pointe vers les autres containers par nom Docker
@@ -267,6 +268,66 @@ services:
       NET_DOJO_SOROBAN_IPV4: soroban
     volumes:
       - ${APP_DATA_DIR}/data/soroban:/home/soroban/data
+
+  # ==========================================================
+  # MEMPOOL SPACE — Visualiseur de mempool Bitcoin
+  # 3 services : base de données, API backend, frontend web
+  # ==========================================================
+  mempool_db:
+    image: mariadb:10.5.8
+    restart: on-failure
+    hostname: mempool_db
+    stop_grace_period: 1m
+    environment:
+      MYSQL_DATABASE: mempool
+      MYSQL_USER: mempool
+      MYSQL_PASSWORD: mempool
+      MYSQL_ROOT_PASSWORD: mempooladmin
+    volumes:
+      - ${APP_DATA_DIR}/data/mempool-db:/var/lib/mysql
+
+  mempool_api:
+    image: mempool/backend:v2.4.0
+    restart: on-failure
+    hostname: mempool_api
+    stop_grace_period: 1m
+    user: "1000:1000"
+    command: "./wait-for-it.sh mempool_db:3306 --timeout=720 --strict -- ./start.sh"
+    depends_on:
+      - mempool_db
+    environment:
+      MEMPOOL_BACKEND: "electrum"
+      CORE_RPC_HOST: ${APP_BITCOIN_NODE_IP}
+      CORE_RPC_PORT: ${APP_BITCOIN_RPC_PORT}
+      CORE_RPC_USERNAME: ${APP_BITCOIN_RPC_USER}
+      CORE_RPC_PASSWORD: ${APP_BITCOIN_RPC_PASS}
+      ELECTRUM_HOST: electrs
+      ELECTRUM_PORT: "50001"
+      ELECTRUM_TLS: "false"
+      DATABASE_ENABLED: "true"
+      DATABASE_HOST: mempool_db
+      DATABASE_PORT: "3306"
+      DATABASE_DATABASE: mempool
+      DATABASE_USERNAME: mempool
+      DATABASE_PASSWORD: mempool
+      MEMPOOL_HTTP_PORT: "8999"
+      MEMPOOL_CACHE_DIR: "/backend/cache"
+      MEMPOOL_CLEAR_PROTECTION_MINUTES: "20"
+    volumes:
+      - ${APP_DATA_DIR}/data/mempool-api:/backend/cache
+
+  mempool_web:
+    image: mempool/frontend:v2.4.0
+    restart: on-failure
+    hostname: mempool_web
+    stop_grace_period: 1m
+    user: "1000:1000"
+    command: "./wait-for mempool_db:3306 --timeout=720 -- nginx -g 'daemon off;'"
+    depends_on:
+      - mempool_db
+    environment:
+      FRONTEND_HTTP_PORT: "8080"
+      BACKEND_MAINNET_HTTP_HOST: mempool_api
 
   # ==========================================================
   # RONIN-UI — Dashboard Next.js
