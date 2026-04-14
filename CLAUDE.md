@@ -236,12 +236,59 @@ git push origin main
 
 ---
 
-## État actuel (2026-04-13)
+## État actuel (2026-04-14)
 
 - App fonctionnelle sur Umbrel Home
 - Tous les services running (node, nginx, db, tor, electrs, explorer, soroban, ronin-ui)
 - Dashboard Ronin-UI complet : Dojo 100%, Bitcoin Core 100%, Indexer 100%
 - Recommended fees OK, uptime Dojo OK, derniers blocs OK
 - Logs fonctionnels
-- Chasse aux bugs en cours (synchro terminée)
+- Push TX fonctionnel via fallback RPC (Bitcoin Knots local)
+- Settings page : boutons fonctionnels (fix entrypoint.sh + conf files dans /app/data/)
+- Soroban/PandoTX : démarre et Tor bootstrappe à 100%, mais ne trouve aucun pair — PandoTX échoue systématiquement avec "No available Soroban node found", fallback RPC utilisé à la place
 - URL .onion BTC-RPC Explorer générée par Tor mais affichage dans UI à vérifier
+
+---
+
+## Settings page — Fix appliqué
+
+La page Settings de Ronin-UI lit/écrit des fichiers `.conf` sur le disque pour les toggles PandoTX et Bitcoin (mempool expiry, etc.). Sur RoninOS ces fichiers existent à `~/dojo/docker/my-dojo/conf/`. Sur Umbrel ce chemin n'existe pas.
+
+**Fix :**
+- `src/const.ts` : chemins conf redirigés vers `/app/data/docker-node.conf` et `/app/data/docker-bitcoind.conf` (volume persistant)
+- `entrypoint.sh` : script qui crée ces fichiers au démarrage du container si absents, avec les valeurs par défaut (PandoTX activé)
+- `Dockerfile` : utilise `entrypoint.sh` au lieu de `CMD ["node", "server.js"]` directement
+
+**Limitation :** les toggles Settings modifient les fichiers conf mais le container `node` (Dojo) lit ses env vars depuis `docker-compose.yml`, pas depuis ces fichiers. Les changements ne sont donc pas appliqués à Dojo sans restart manuel. Pour rendre les toggles vraiment fonctionnels, il faudrait que Ronin-UI redémarre le container `node` via le Docker socket après chaque changement.
+
+---
+
+## Soroban / PandoTX — État et diagnostic
+
+**Architecture :**
+- Ronin-UI ne parle pas directement à Soroban
+- Flux : Ronin-UI → nginx → node (Dojo) → Soroban → bootstrap nodes via Tor
+- Communication node↔soroban via NATS IPC (port 4322) et DNS Docker (`NET_DOJO_SOROBAN_IPV4: soroban`)
+- Soroban utilise son propre Tor interne (127.0.0.1:9050) pour atteindre les bootstrap nodes .onion
+
+**Bootstrap nodes configurés (SOROBAN_P2P_BOOTSTRAP_MAIN) :**
+5 adresses .onion hardcodées dans `docker-compose.yml` (lignes 265-266) — issues du code source RoninDojo v2.3.0 téléchargé depuis Gitea .onion.
+
+**Symptômes observés :**
+- Soroban démarre, Tor bootstrappe à 100%
+- S'annonce toutes les 90 secondes (`level=info msg=Announce`)
+- Aucune connexion aux bootstrap nodes visible dans les logs
+- `SOROBAN_DHT_SERVER_MODE` passé à `"on"` sans effet
+- Mode debug (`SOROBAN_LOG_LEVEL: debug`) non applicable via `docker restart` — nécessite recréation du container avec les variables Umbrel injectées
+
+**Conclusion :** impossible de déterminer si le problème est externe (bootstrap nodes hors ligne) ou interne (bug config Soroban sur Umbrel). À investiguer via la communauté RoninDojo.
+
+**Config actuelle docker-compose :**
+```
+SOROBAN_DHT_SERVER_MODE: "on"
+SOROBAN_LOG_LEVEL: info
+NODE_PANDOTX_PUSH: "on"
+NODE_PANDOTX_PROCESS: "on"
+NODE_PANDOTX_FALLBACK_MODE: convenient
+NODE_PANDOTX_NB_RETRIES: "2"
+```
