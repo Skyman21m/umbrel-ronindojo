@@ -13,11 +13,11 @@ if [ ! -f "/app/data/docker-bitcoind.conf" ]; then
   printf "BITCOIND_MEMPOOL_EXPIRY=336\nBITCOIND_PERSIST_MEMPOOL=on\nBITCOIND_BAN_KNOTS=off\n" > "/app/data/docker-bitcoind.conf"
 fi
 
-# Initialize ronin-ui.dat with APP_PASSWORD as the default login password.
-# APP_PASSWORD is shown to users in Umbrel's "Default credentials" popup.
-# NODE_ADMIN_KEY (APP_SEED) is separate and used only for Dojo API.
+# Initialize ronin-ui.dat on first run.
+# No password stored — login falls back to APP_PASSWORD (Umbrel default credential).
+# When user changes password in Settings, the new password is written here.
 if [ ! -f "/app/data/ronin-ui.dat" ]; then
-  printf '{"initialized":true,"password":"%s"}' "${APP_PASSWORD}" > "/app/data/ronin-ui.dat"
+  printf '{"initialized":true}' > "/app/data/ronin-ui.dat"
 fi
 
 exec node server.js

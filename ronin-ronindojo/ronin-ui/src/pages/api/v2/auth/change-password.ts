@@ -54,9 +54,12 @@ const handler = (req: NextApiRequest, res: NextApiResponse<Response | ErrorRespo
       pipe(
         taskEither.tryCatch(
           async () => {
-            const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
-            const parsed = JSON.parse(data);
-            const storedPassword = parsed.password || "";
+            let storedPassword = process.env.APP_PASSWORD || "";
+            try {
+              const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
+              const parsed = JSON.parse(data);
+              if (parsed.password) storedPassword = parsed.password;
+            } catch {}
             if (currentPassword !== storedPassword) throw new Error("mismatch");
           },
           () => badRequest("Old password does not match"),
