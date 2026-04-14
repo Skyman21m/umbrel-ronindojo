@@ -8,7 +8,7 @@ services:
   # ==========================================================
   app_proxy:
     environment:
-      APP_HOST: ronin-ronindojo_ronin-ui_1
+      APP_HOST: ronin-ronindojo-ronin-ui-1
       APP_PORT: 3000
 
   # ==========================================================
@@ -361,7 +361,7 @@ services:
       BITCOIND_RPC_USER: ${APP_BITCOIN_RPC_USER}
       BITCOIND_RPC_PASSWORD: ${APP_BITCOIN_RPC_PASS}
       # Docker container names for exec
-      DOCKER_TOR_CONTAINER: ronin-ronindojo_tor_1
+      DOCKER_TOR_CONTAINER: ronin-ronindojo-tor-1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${APP_DATA_DIR}/data/ronin-ui:/app/data
