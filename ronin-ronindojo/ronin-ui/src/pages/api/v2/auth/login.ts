@@ -14,6 +14,8 @@ import { toBoomError } from "../../../../lib/server/to-boom-error";
 import { readDataFile, writeDataFile } from "../../../../lib/server/dataFile";
 import { decryptString } from "../../../../lib/server/decryptString";
 import { useRealData } from "../../../../lib/common";
+import { RONIN_UI_DATA_FILE } from "../../../../const";
+import { promises as fs } from "fs";
 
 const RequestBody = t.type({
   password: NonEmptyString,
@@ -37,23 +39,34 @@ const handler = (req: NextApiRequest, res: NextApiResponse<Response | ErrorRespo
     taskEither.fromEither,
     taskEither.chain((parsedCredentials) =>
       pipe(
-        // Authenticate using the Dojo admin key instead of OS password
-        string.Eq.equals(parsedCredentials.password, process.env.NODE_ADMIN_KEY || ""),
-        boolean.fold(
-          () => taskEither.left(unauthorized("Incorrect password")),
-          () =>
-            pipe(
-              taskEither.right({ isLoggedIn: true, username: process.env.RONIN_UI_USERNAME || "umbrel" }),
-              taskEither.chainFirst((userData) =>
-                pipe(
-                  () => {
-                    req.session.user = userData;
-                  },
-                  taskEither.fromIO,
-                  taskEither.chain(() => taskEither.tryCatch(() => req.session.save(), toBoomError(500))),
+        // Read password from ronin-ui.dat, fall back to NODE_ADMIN_KEY
+        taskEither.tryCatch(
+          async () => {
+            try {
+              const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
+              const parsed = JSON.parse(data);
+              return parsed.password || process.env.NODE_ADMIN_KEY || "";
+            } catch {
+              return process.env.NODE_ADMIN_KEY || "";
+            }
+          },
+          toBoomError(500),
+        ),
+        taskEither.chain((storedPassword) =>
+          string.Eq.equals(parsedCredentials.password, storedPassword)
+            ? pipe(
+                taskEither.right({ isLoggedIn: true, username: process.env.RONIN_UI_USERNAME || "umbrel" }),
+                taskEither.chainFirst((userData) =>
+                  pipe(
+                    () => {
+                      req.session.user = userData;
+                    },
+                    taskEither.fromIO,
+                    taskEither.chain(() => taskEither.tryCatch(() => req.session.save(), toBoomError(500))),
+                  ),
                 ),
-              ),
-            ),
+              )
+            : taskEither.left(unauthorized("Incorrect password")),
         ),
       ),
     ),

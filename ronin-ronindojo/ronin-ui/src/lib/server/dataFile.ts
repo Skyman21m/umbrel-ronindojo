@@ -7,9 +7,14 @@ import * as t from "io-ts";
 import { RONIN_UI_DATA_FILE } from "../../const";
 import { toBoomError } from "./to-boom-error";
 
-export const DataFile = t.type({
-  initialized: t.boolean,
-});
+export const DataFile = t.intersection([
+  t.type({
+    initialized: t.boolean,
+  }),
+  t.partial({
+    password: t.string,
+  }),
+]);
 
 export type DataFile = t.TypeOf<typeof DataFile>;
 

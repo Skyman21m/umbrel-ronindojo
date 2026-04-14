@@ -14,9 +14,9 @@ import { writeDataFile } from "../../../../lib/server/dataFile";
 import { Password } from "../../../../lib/common/types";
 import { toBoomError } from "../../../../lib/server/to-boom-error";
 import { SessionData, withSessionApi } from "../../../../lib/server/session";
-import { setUserPassword } from "../../../../lib/server/roninDojoCredentials";
-import { verifyUserPassword } from "../../../../lib/server/sudo";
 import { decryptString } from "../../../../lib/server/decryptString";
+import { RONIN_UI_DATA_FILE } from "../../../../const";
+import { promises as fs } from "fs";
 
 const RequestBody = t.type({
   oldPassword: NonEmptyString,
@@ -48,15 +48,27 @@ const handler = (req: NextApiRequest, res: NextApiResponse<Response | ErrorRespo
     taskEither.fromEither,
     taskEither.chainFirst(({ oldPassword }) =>
       pipe(
-        verifyUserPassword(oldPassword),
-        taskEither.mapLeft(() => badRequest("Old password does not match")),
+        taskEither.tryCatch(
+          async () => {
+            try {
+              const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
+              const parsed = JSON.parse(data);
+              const storedPassword = parsed.password || process.env.NODE_ADMIN_KEY || "";
+              if (oldPassword !== storedPassword) throw new Error("Old password does not match");
+            } catch (error: any) {
+              if (error.message === "Old password does not match") throw error;
+              // File doesn't exist yet or unreadable — accept NODE_ADMIN_KEY as old password
+              if (oldPassword !== (process.env.NODE_ADMIN_KEY || "")) throw new Error("Old password does not match");
+            }
+          },
+          () => badRequest("Old password does not match"),
+        ),
       ),
     ),
-    taskEither.chain(({ oldPassword, newPassword }) =>
+    taskEither.chain(({ newPassword }) =>
       pipe(
-        setUserPassword(newPassword, oldPassword),
-        taskEither.chainFirst(() => pipe(writeDataFile({ initialized: true }))),
-        taskEither.map(() => ({ isLoggedIn: true, username: os.userInfo().username })),
+        writeDataFile({ initialized: true, password: newPassword }),
+        taskEither.map(() => ({ isLoggedIn: true, username: process.env.RONIN_UI_USERNAME || "umbrel" })),
         taskEither.chainFirst((userData) =>
           pipe(
             () => {

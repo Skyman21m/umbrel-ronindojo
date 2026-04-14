@@ -20,7 +20,7 @@ import { encryptString } from "../lib/client/encryptString";
 
 type Props = InferGetServerSidePropsType<typeof getServerSideProps>;
 
-const SignIn: NextPage<Props> = ({ reinitialize }) => {
+const SignIn: NextPage<Props> = ({ reinitialize, defaultPassword }) => {
   const router = useRouter();
   const {
     register,
@@ -87,7 +87,8 @@ const SignIn: NextPage<Props> = ({ reinitialize }) => {
             Sign In {(isSubmitting || isRouteChanging) && <CircularLoader className="h-6 w-6" color="primary" />}
           </button>
         </div>
-        {reinitialize && <div className="w-full lg:w-96 mx-auto bg-border text-secondary p-4 rounded mb-8">Use your SSH password to log into RoninDojo</div>}
+        {defaultPassword && <div className="w-full lg:w-96 mx-auto bg-border text-secondary p-4 rounded mb-8">Default password: <span className="text-white font-mono select-all">{defaultPassword}</span><br /><span className="text-paragraph text-sm">You can change this in Settings after login.</span></div>}
+        {reinitialize && !defaultPassword && <div className="w-full lg:w-96 mx-auto bg-border text-secondary p-4 rounded mb-8">Use your SSH password to log into RoninDojo</div>}
       </form>
 
       <ErrorMessage errors={[error, errors.password?.type === "required" ? "Password is required" : null]} />
@@ -104,6 +105,7 @@ const SignIn: NextPage<Props> = ({ reinitialize }) => {
 
 type SsrProps = PageProps<{
   reinitialize: boolean;
+  defaultPassword: string | null;
 }>;
 
 export const getServerSideProps = withSessionSsr<SsrProps>(async (ctx: GetServerSidePropsContext) => {
@@ -113,11 +115,11 @@ export const getServerSideProps = withSessionSsr<SsrProps>(async (ctx: GetServer
     return serverSideProps;
   }
 
-  const isDataFileValid = await pipe(
+  const dataFileResult = await pipe(
     readDataFile,
     taskEither.match(
-      () => false,
-      () => true,
+      () => null,
+      (data) => data,
     ),
   )();
 
@@ -125,7 +127,8 @@ export const getServerSideProps = withSessionSsr<SsrProps>(async (ctx: GetServer
     ...serverSideProps,
     props: {
       withLayout: false,
-      reinitialize: !isDataFileValid,
+      reinitialize: !dataFileResult,
+      defaultPassword: dataFileResult?.password ?? null,
     },
   };
 });
