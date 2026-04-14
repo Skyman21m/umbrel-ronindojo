@@ -146,6 +146,9 @@ services:
       # Soroban
       SOROBAN_INSTALL: "on"
       SOROBAN_PORT: "4242"
+      SOROBAN_ANNOUNCE: "on"
+      SOROBAN_ANNOUNCE_KEY_MAIN: "soroban.cluster.mainnet.nodes"
+      SOROBAN_ANNOUNCE_KEY_TEST: "soroban.cluster.testnet.nodes"
       # Réseau interne (routage vers les autres containers)
       TOR_SOCKS_PORT: "9050"
       NET_DOJO_TOR_IPV4: tor
