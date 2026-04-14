@@ -13,8 +13,6 @@ import { withV2Middlewares } from "../../../../middlewares/v2";
 import { toBoomError } from "../../../../lib/server/to-boom-error";
 import { readDataFile, writeDataFile } from "../../../../lib/server/dataFile";
 import { decryptString } from "../../../../lib/server/decryptString";
-import { RONIN_UI_DATA_FILE } from "../../../../const";
-import { promises as fs } from "fs";
 
 const RequestBody = t.type({
   password: NonEmptyString,
@@ -38,20 +36,9 @@ const handler = (req: NextApiRequest, res: NextApiResponse<Response | ErrorRespo
     taskEither.fromEither,
     taskEither.chain((parsedCredentials) =>
       pipe(
-        // Try ronin-ui.dat first, then APP_PASSWORD env var
-        taskEither.tryCatch(
-          async () => {
-            try {
-              const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
-              const parsed = JSON.parse(data);
-              if (parsed.password) return parsed.password;
-            } catch {}
-            return process.env.APP_PASSWORD || process.env.NODE_ADMIN_KEY || "";
-          },
-          toBoomError(500),
-        ),
-        taskEither.chain((storedPassword) =>
-          string.Eq.equals(parsedCredentials.password, storedPassword)
+        string.Eq.equals(parsedCredentials.password, process.env.APP_PASSWORD || ""),
+        (match) =>
+          match
             ? pipe(
                 taskEither.right({ isLoggedIn: true, username: process.env.RONIN_UI_USERNAME || "umbrel" }),
                 taskEither.chainFirst((userData) =>
@@ -65,7 +52,6 @@ const handler = (req: NextApiRequest, res: NextApiResponse<Response | ErrorRespo
                 ),
               )
             : taskEither.left(unauthorized("Incorrect password")),
-        ),
       ),
     ),
     taskEither.chainFirst(() =>
