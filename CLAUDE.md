@@ -127,8 +127,8 @@ Ronin-UI est une interface **Next.js** conçue pour tourner sur RoninOS (bare-me
 
 ### Variables d'environnement Umbrel disponibles
 ```
-APP_PASSWORD          ← mot de passe Umbrel = NODE_ADMIN_KEY Dojo
-APP_SEED              ← seed aléatoire = NODE_API_KEY Dojo
+APP_PASSWORD          ← mot de passe login Ronin-UI (affiché dans popup "Default credentials")
+APP_SEED              ← secret unique par app = NODE_ADMIN_KEY + NODE_API_KEY Dojo
 APP_DATA_DIR          ← /home/umbrel/umbrel/app-data/ronin-ronindojo/
 APP_BITCOIN_NODE_IP   ← IP du container Bitcoin Core d'Umbrel
 APP_BITCOIN_RPC_PORT  ← port RPC Bitcoin (généralement 8332)
@@ -138,6 +138,13 @@ APP_BITCOIN_ZMQ_RAWTX_PORT    ← 28333
 APP_BITCOIN_ZMQ_HASHBLOCK_PORT ← 28334
 APP_BITCOIN_P2P_PORT  ← port P2P Bitcoin
 ```
+
+**Comment Umbrel génère APP_PASSWORD et APP_SEED :**
+Les deux sont des HMAC-SHA256 (hash hex 64 chars) dérivés du seed global Umbrel avec un identifiant unique par app :
+- `APP_SEED` = `HMAC-SHA256(umbrel_seed, "app-ronin-ronindojo-seed")`
+- `APP_PASSWORD` = `HMAC-SHA256(umbrel_seed, "app-ronin-ronindojo-seed-APP_PASSWORD")`
+
+Ce sont des valeurs déterministes, fixes, uniques par installation.
 
 ### Restart vs Réinstallation
 - **Restart** (clic droit → restart sur l'icône Umbrel) : recharge l'image Docker depuis ghcr.io. Suffisant pour les changements de **code Ronin-UI**.
@@ -167,9 +174,36 @@ Ronin-UI est une app **Next.js** avec SSR (Server-Side Rendering). Le backend No
 - **Docker socket** (`/var/run/docker.sock`) — statut et logs des containers
 - **Système** — CPU, RAM, uptime
 
-### Authentification
-- Login : `umbrel` / `APP_PASSWORD` (mot de passe Umbrel)
-- Cookie de session (Iron Session)
+### Authentification — Architecture
+
+**Deux systèmes séparés :**
+
+| Fonction | Valeur | Source | Visible où |
+|----------|--------|--------|------------|
+| Login Ronin-UI | `APP_PASSWORD` | Variable d'env Umbrel | Popup "Default credentials" Umbrel |
+| Admin Key Dojo (API/pairing) | `APP_SEED` = `NODE_ADMIN_KEY` | Variable d'env Umbrel | Page Pairing Ronin-UI |
+
+**Flux login :**
+1. `login.ts` lit `/app/data/ronin-ui.dat` pour un mot de passe custom
+2. Si pas de password custom → fallback sur `APP_PASSWORD` (env var)
+3. Comparaison après déchiffrement RSA (clé générée au build Next.js)
+4. Session via cookie Iron Session
+
+**Changement de mot de passe :**
+- `change-password.ts` vérifie l'ancien mot de passe (même logique : `ronin-ui.dat` puis `APP_PASSWORD`)
+- Écrit le nouveau dans `ronin-ui.dat` : `{"initialized":true,"password":"nouveauMotDePasse"}`
+- Le login utilisera désormais le mot de passe custom
+
+**Comparaison avec RoninOS classique :**
+- Sur RPI : un seul mot de passe pour tout (login UI = sudo Linux = admin key). Généré par `_rand_passwd 69` (69 chars alphanumériques aléatoires)
+- Sur Umbrel : login et admin key séparés. Login = `APP_PASSWORD`, admin key = `APP_SEED`. Pas de `sudo` dans le container.
+
+**Fichiers modifiés pour l'auth :**
+- `login.ts` — vérifie `ronin-ui.dat` puis `APP_PASSWORD`
+- `change-password.ts` — vérifie ancien mot de passe, écrit nouveau dans `ronin-ui.dat`
+- `set-password.ts` — idem (utilisé par la page setup)
+- `entrypoint.sh` — crée `ronin-ui.dat` avec `{"initialized":true}` (sans password = fallback `APP_PASSWORD`)
+
 - Si cookie corrompu dans le navigateur → page 404 ou redirect `/install-progress`
 - Solution : vider les données du site `192.168.1.30` dans le navigateur (pas juste les cookies, tout le site data)
 
