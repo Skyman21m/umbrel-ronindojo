@@ -4,5 +4,7 @@ export APP_RONINDOJO_NGINX_PORT="8080"
 
 # Create data directories with correct ownership (1000:1000 = umbrel)
 # Docker would create them as root if they don't exist
-mkdir -p "${APP_DATA_DIR}/data/tor" "${APP_DATA_DIR}/data/mysql" "${APP_DATA_DIR}/data/electrs" "${APP_DATA_DIR}/data/soroban" "${APP_DATA_DIR}/data/ronin-ui" "${APP_DATA_DIR}/data/mempool-db" "${APP_DATA_DIR}/data/mempool-api"
-chown -R 1000:1000 "${APP_DATA_DIR}/data" 2>/dev/null || true
+if [ -n "${APP_DATA_DIR:-}" ]; then
+  mkdir -p "${APP_DATA_DIR}/data/tor" "${APP_DATA_DIR}/data/mysql" "${APP_DATA_DIR}/data/electrs" "${APP_DATA_DIR}/data/soroban" "${APP_DATA_DIR}/data/ronin-ui" "${APP_DATA_DIR}/data/mempool-db" "${APP_DATA_DIR}/data/mempool-api"
+  chown -R 1000:1000 "${APP_DATA_DIR}/data" 2>/dev/null || true
+fi
