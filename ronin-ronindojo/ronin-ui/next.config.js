@@ -96,7 +96,7 @@ const nextConfig = withSvgr({
     return [
       {
         source: "/logs",
-        destination: "/logs/bitcoind",
+        destination: "/logs/node",
       },
     ];
   },
