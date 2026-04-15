@@ -350,6 +350,8 @@ services:
       - CHOWN
       - SETUID
       - SETGID
+      - DAC_OVERRIDE
+      - FOWNER
     depends_on:
       - node
       - tor
