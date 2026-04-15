@@ -447,3 +447,55 @@ sg docker -c "docker build --build-arg ELECTRS_LINUX_UID=1000 --build-arg ELECTR
 # Soroban (Dockerfile custom)
 sg docker -c "docker build -f /home/rd/Documents/GitHub/umbrel-ronindojo/ronin-ronindojo/dockerfiles/Dockerfile.soroban -t ghcr.io/skyman21m/dojo-soroban:0.4.2 /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/soroban"
 ```
+
+---
+
+## Migration non-root — Pièges rencontrés et leçons apprises
+
+Le passage des containers de `user: "0:0"` (root) à `user: "1000:1000"` a été le chantier le plus complexe du projet. Voici les 7 problèmes rencontrés dans l'ordre, pour éviter de retomber dans les mêmes pièges.
+
+### 1. Les images Dojo avaient des UIDs custom
+
+Les images originales utilisaient des UIDs spécifiques (tor=1104, electrs=1106, soroban=1111). On ne peut pas juste mettre `user: "1000:1000"` dans le docker-compose — les fichiers internes de l'image (scripts, binaires) appartiennent aux UIDs custom et deviennent inaccessibles.
+
+**Solution :** rebuilder les images avec `--build-arg *_LINUX_UID=1000 --build-arg *_LINUX_GID=1000`.
+
+### 2. Conflits d'UID à 1000 dans les Dockerfiles
+
+**Node :** le Dockerfile original créait un group `tor` avec `TOR_LINUX_GID`. Si on passe GID 1000, ça conflicter avec le group `node` natif (déjà GID 1000 dans `node:22-alpine`).
+
+**Soroban :** le Dockerfile crée deux users (`tor` puis `soroban`). Les deux ne peuvent pas avoir UID 1000.
+
+**Solution :** Dockerfiles custom (`dockerfiles/Dockerfile.node` et `dockerfiles/Dockerfile.soroban`) qui éliminent les conflits — node sans group tor séparé, soroban avec un seul user pour Tor interne + Soroban.
+
+### 3. Docker crée les volumes en root
+
+Quand le docker-compose monte `${APP_DATA_DIR}/data/tor:/var/lib/tor` et que le sous-dossier `data/tor` n'existe pas, Docker le crée en `root:root`. Le container en UID 1000 ne peut pas y écrire → crash au démarrage.
+
+**Tentative échouée — container `init` :** un container Alpine en root avec `depends_on: condition: service_completed_successfully` qui fait le `chown` puis s'arrête. Résultat : l'installation Umbrel échoue complètement (le flux d'installation ne supporte pas ce pattern).
+
+**Solution qui fonctionne — `exports.sh` :** ce script est exécuté par Umbrel **avant** `docker compose up`. On y crée les dossiers avec `mkdir -p` + `chown -R 1000:1000`.
+
+### 4. `exports.sh` — variable non définie
+
+Le script était sourcé dans un contexte strict (`set -u`) avant que `APP_DATA_DIR` ne soit définie → `APP_DATA_DIR: unbound variable` → installation échoue à 1%.
+
+**Solution :** guard avec `if [ -n "${APP_DATA_DIR:-}" ]`.
+
+### 5. `tor-restart.sh` monté en volume — permission denied
+
+On monte `tor-restart.sh` en volume pour overrider le `restart.sh` interne (SocksPolicy corrigée). Mais Umbrel copie le fichier depuis le repo GitHub **sans le flag exécutable** → le container ne peut pas l'exécuter → restart loop "permission denied".
+
+**Solution :** `chmod +x` dans Git (`git update-index --chmod=+x`) + `command: "bash /restart.sh"` dans le docker-compose pour contourner le problème.
+
+### 6. ronin-ui — cap_drop trop restrictif
+
+ronin-ui reste en `user: "0:0"` (Docker socket). On a ajouté `cap_drop: ALL` pour limiter les droits, mais avec seulement `CHOWN/SETUID/SETGID` rajoutés, root ne pouvait plus écrire dans les fichiers owned par UID 1000. Il manquait `DAC_OVERRIDE` (bypasser les permissions fichiers) et `FOWNER`.
+
+**Solution :** ajouter `DAC_OVERRIDE` et `FOWNER` à `cap_add`.
+
+### 7. Nommage des containers — underscores vs tirets
+
+Docker Compose v1 utilise des underscores (`ronin-ronindojo_ronin-ui_1`), v2 des tirets (`ronin-ronindojo-ronin-ui-1`). Le format change selon le contexte (installation fraîche vs `curl` + restart). `APP_HOST` et `DOCKER_TOR_CONTAINER` doivent pointer vers le bon nom sinon l'app est inaccessible.
+
+**Solution :** `container_name:` dans le docker-compose pour forcer un nom fixe, indépendant de la version de Docker Compose.
