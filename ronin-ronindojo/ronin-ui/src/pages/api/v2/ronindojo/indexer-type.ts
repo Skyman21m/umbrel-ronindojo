@@ -26,16 +26,11 @@ const translateIndexerType = (containerInfoData: ContainerInfoResponse | null | 
     option.map(
       flow(
         ROA.reduce(null as IndexerType, (str, container) => {
-          switch (container.Names.join("")) {
-            case "/fulcrum":
-              return "Fulcrum";
-            case "/electrs":
-              return "Electrs";
-            case "/indexer":
-              return "Addrindexrs";
-            default:
-              return str;
-          }
+          const name = container.Names.join("").toLowerCase();
+          if (name.includes("fulcrum")) return "Fulcrum";
+          if (name.includes("electrs")) return "Electrs";
+          if (name.includes("indexer")) return "Addrindexrs";
+          return str;
         }),
       ),
     ),

@@ -101,11 +101,11 @@ const PairingPage: NextPage<Props> = ({
         <div className="relative grid grid-cols-1 lg:grid-cols-3 grid-flow-row-dense gap-6">
           <div className="box bg-black flex flex-col items-center">
             <div className="text-center mb-6 flex-1 w-full">
-              <h4 className="text-white text-xl font-bold mb-4">Samourai Dojo</h4>
+              <h4 className="text-white text-xl font-bold mb-4">Dojo</h4>
               <div className="w-20 h-20 mb-6 bg-black border border-primary shadow-primary text-white rounded-full inline-flex items-center justify-center">
                 <DojoIcon width={60} height={60} className="fill-current" />
               </div>
-              <p className="text-paragraph mb-6">Pair your Samourai Wallet with your Dojo</p>
+              <p className="text-paragraph mb-6">Pair your wallet with your Dojo</p>
             </div>
             <div className="text-center w-full">
               <button className="button" onClick={() => setDojoDialogOpen(true)}>
