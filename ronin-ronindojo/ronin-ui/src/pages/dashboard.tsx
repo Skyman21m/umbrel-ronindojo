@@ -19,7 +19,7 @@ import { ManageButton } from "../components/ManageButton";
 import { ManageDojoDialog } from "../components/ManageDojoDialog";
 import { ManageExplorerDialog } from "../components/ManageExplorerDialog";
 import { FeesResponse, StatusResponse } from "../lib/server/dojoApi";
-import { MempoolInfo, BlockHeader } from "../lib/server/bitcoind";
+import { MempoolInfo, BlockHeader, NetworkInfo } from "../lib/server/bitcoind";
 
 import { ReactComponent as DojoIcon } from "../components/icons/dashboard_icons/dojo.svg";
 import { ReactComponent as BitcoinIcon } from "../components/icons/dashboard_icons/bitcoin.svg";
@@ -152,6 +152,17 @@ const DashboardPage: NextPage<Props> = ({
     refreshInterval: 20 * SECOND,
     fallbackData: containerInfo,
   });
+
+  const { data: networkInfoData } = useSWR<NetworkInfo | null>("/bitcoind/network-info", {
+    revalidateOnFocus: false,
+  });
+
+  const bitcoinClientName = (() => {
+    const sub = networkInfoData?.subversion || "";
+    if (sub.includes("Knots")) return "Bitcoin Knots";
+    if (sub.includes("Libre")) return "Libre Bitcoin";
+    return "Bitcoin Core";
+  })();
 
   const isDbRunning = Boolean(containerInfoData?.find((c) => nameIncludes(c, "db"))?.State.toLowerCase() === "running");
   const isNodejsRunning = Boolean(containerInfoData?.find((c) => nameIncludes(c, "nodejs") || nameIncludes(c, "_node_") || nameIncludes(c, "_node-"))?.State.toLowerCase() === "running");
@@ -374,7 +385,7 @@ const DashboardPage: NextPage<Props> = ({
         </motion.div>
 
         <motion.div className="box bg-surface row-span-5 relative" variants={itemAnimationVariants}>
-          <h2 className="text-primary font-primary mb-6">Bitcoin Core</h2>
+          <h2 className="text-primary font-primary mb-6">{bitcoinClientName}</h2>
           <div className="flex items-center justify-between mb-7">
             <div className="flex flex-col items-center">
               <h3 className="text-white font-primary text-3xl">{syncProgress}%</h3>
