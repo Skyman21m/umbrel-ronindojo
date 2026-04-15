@@ -1,0 +1,97 @@
+#
+# Build torproject from source
+#
+FROM    alpine:3.22 AS torproject
+
+ENV     TOR_GIT_URL     https://git.torproject.org/tor.git
+ENV     TOR_VERSION     tor-0.4.8.16
+
+RUN     apk --update --no-cache add ca-certificates
+RUN     apk --no-cache add alpine-sdk automake autoconf
+RUN     apk --no-cache add openssl-dev libevent-dev zlib-dev
+
+RUN     git clone $TOR_GIT_URL /tor -b $TOR_VERSION --depth 1
+
+WORKDIR /tor
+
+RUN     ./autogen.sh
+
+RUN     ./configure                                           \
+        --disable-system-torrc                                \
+        --disable-asciidoc                                    \
+        --disable-unittests                                   \
+        --prefix=/stage
+
+RUN     make -j 4 && make install
+
+RUN     cp /stage/etc/tor/torrc.sample /stage/.torrc
+
+#
+# Build go app
+#
+FROM    golang:1.23-alpine3.22 AS gobuild
+
+ENV     SOROBAN_VERSION         0.4.2
+ENV     SOROBAN_URL             https://github.com/Dojo-Open-Source-Project/soroban/archive/refs/tags/v$SOROBAN_VERSION.tar.gz
+
+RUN     apk --no-cache --update add ca-certificates
+RUN     apk --no-cache --update add alpine-sdk linux-headers wget
+
+RUN     set -ex && \
+        mkdir -p /stage && \
+        mkdir -p /src && \
+        cd ~ && \
+        wget -qO soroban.tar.gz "$SOROBAN_URL" && \
+        tar -xzvf soroban.tar.gz -C /src --strip-components 1 && \
+        rm soroban.tar.gz && \
+        cd /src
+
+WORKDIR /src
+RUN     go mod download
+RUN     go build -a -tags netgo -o /stage/soroban-server ./cmd/server
+
+#
+# Final Soroban image — single user 1000:1000
+#
+FROM    alpine:3.22
+
+ENV     SOROBAN_HOME=/home/soroban
+
+RUN     apk --update --no-cache add ca-certificates bash
+RUN     apk --no-cache add openssl libevent zlib curl
+
+# Copy Tor binaries
+COPY    --from=torproject /stage /usr/local
+
+# Copy Soroban binary
+COPY    --from=gobuild /stage/soroban-server /usr/local/bin
+
+# Create single user soroban (UID 1000, GID 1000)
+RUN     addgroup -g 1000 -S soroban && \
+        adduser --system --ingroup soroban --uid 1000 soroban
+
+# Create directories
+RUN     mkdir -p /var/lib/tor && \
+        chown soroban:soroban /var/lib/tor && \
+        mkdir -p "$SOROBAN_HOME/data" && \
+        chown soroban:soroban "$SOROBAN_HOME/data"
+
+# Copy torrc
+RUN     cp /usr/local/etc/tor/torrc.sample "$SOROBAN_HOME/.torrc" && \
+        chown soroban:soroban "$SOROBAN_HOME/.torrc"
+
+# Copy restart script
+COPY    --chown=soroban:soroban --chmod=754 ./restart.sh /restart.sh
+
+# Copy healthcheck script
+COPY    --chown=soroban:soroban --chmod=754 ./healthcheck.sh /healthcheck.sh
+
+EXPOSE  9050
+
+USER    soroban
+
+ENTRYPOINT [ "/restart.sh" ]
+
+STOPSIGNAL SIGINT
+
+HEALTHCHECK --interval=600s --timeout=60s --start-period=600s --start-interval=120s CMD /healthcheck.sh

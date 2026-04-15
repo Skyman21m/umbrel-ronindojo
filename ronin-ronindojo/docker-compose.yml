@@ -37,10 +37,8 @@ services:
   tor:
     image: ghcr.io/skyman21m/dojo-tor:1.23.0
     restart: on-failure
-    user: "0:0"
     hostname: tor
-    command: >
-      bash -c "chmod -R 700 /var/lib/tor && /restart.sh"
+    command: "/restart.sh"
     environment:
       COMMON_BTC_NETWORK: mainnet
       TOR_SOCKS_PORT: "9050"
@@ -83,7 +81,6 @@ services:
   node:
     image: ghcr.io/skyman21m/dojo-nodejs:1.28.2
     restart: on-failure
-    user: "0:0"
     hostname: node
     depends_on:
       - db
@@ -182,7 +179,6 @@ services:
     image: ghcr.io/skyman21m/dojo-electrs:1.2.0
     restart: on-failure
     stop_grace_period: 1m
-    user: "0:0"
     hostname: electrs
     command: "/restart.sh"
     depends_on:
@@ -236,7 +232,6 @@ services:
   soroban:
     image: ghcr.io/skyman21m/dojo-soroban:0.4.2
     restart: on-failure
-    user: "0:0"
     hostname: soroban
     stop_grace_period: 1m
     environment:
@@ -343,6 +338,14 @@ services:
     restart: on-failure
     user: "0:0"
     hostname: ronin-ui
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
     depends_on:
       - node
       - tor
