@@ -278,21 +278,29 @@ git push origin main
 | PandoTx "No available Soroban node found" | Variables SOROBAN_ANNOUNCE manquantes dans service node | Fix appliqué : ajout SOROBAN_ANNOUNCE + SOROBAN_ANNOUNCE_KEY_MAIN/TEST dans node |
 | Tor SocksPolicy rejette connexions PandoTx | SocksPolicy hardcodée à 172.28.0.0/16 (réseau RoninOS) | Fix appliqué : tor-restart.sh monté en volume avec `accept 0.0.0.0/0` |
 | Containers en root (user: "0:0") | Volumes créés en root par Docker | Fix appliqué : exports.sh crée les dossiers en 1000:1000 avant le lancement, images rebuildées avec UID 1000 |
+| Containers d'autres apps dans le dashboard | Docker socket liste tous les containers Umbrel | Fix appliqué : filtre `name.includes("ronin-ronindojo")` dans `docker.ts` |
+| Logs : erreur au chargement initial | Redirection par défaut vers `/logs/bitcoind` (absent) | Fix appliqué : redirection vers `/logs/node` dans `next.config.js` |
+| Pairing : "Couldn't determine indexer type" | Nom exact `/electrs` ne matche pas `ronin-ronindojo_electrs_1` | Fix appliqué : pattern matching (`name.includes`) dans `indexer-type.ts` |
+| Pairing : "Samourai Wallet" mentionné | Branding obsolète (Samourai Wallet n'existe plus) | Fix appliqué : renommé en "Dojo" / "wallet" dans `pairing.tsx` |
+| Dashboard : "Bitcoin Core" hardcodé | Pas de détection du client Bitcoin utilisé | Fix appliqué : appel RPC `getnetworkinfo` pour lire `subversion` et afficher Core/Knots/Libre dynamiquement |
 
 ---
 
 ## État actuel (2026-04-15)
 
-- App fonctionnelle sur Umbrel Home
+- App fonctionnelle sur Umbrel Home — prête pour le community store
 - 13 containers running (node, nginx, db, tor, electrs, explorer, soroban, ronin-ui, mempool_db, mempool_api, mempool_web, app_proxy, tor_server)
-- Dashboard Ronin-UI complet : Dojo 100%, Bitcoin Core 100%, Indexer 100%
+- Dashboard Ronin-UI : détection dynamique Bitcoin Core/Knots/Libre, Dojo 100%, Indexer 100%
 - Recommended fees OK, uptime Dojo OK, derniers blocs OK
-- Logs fonctionnels
+- Logs fonctionnels (défaut sur Node.js, plus d'erreur au chargement)
 - Push TX fonctionnel via PandoTx (Soroban/Tor) — 150+ pairs trouvés sur le réseau
 - Settings page : boutons fonctionnels (fix entrypoint.sh + conf files dans /app/data/)
 - Mempool Space : intégré et running, URL .onion générée par Tor
 - Soroban/PandoTX : fonctionnel, rejoint le réseau P2P, trouve les pairs via bootstrap nodes
+- Pairing : Dojo (QR code) + Electrum server (Electrs détecté), branding Samourai retiré
 - Sécurité : tor, node, electrs, soroban en user 1000:1000 (plus de root). Ronin-ui en root avec restrictions (cap_drop ALL, no-new-privileges)
+- Auth : APP_PASSWORD pour le login (popup Umbrel), APP_SEED pour l'admin key Dojo (pairing)
+- Containers filtrés par préfixe `ronin-ronindojo` — pas de pollution par les autres apps Umbrel
 
 ---
 
