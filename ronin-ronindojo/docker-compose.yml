@@ -12,6 +12,23 @@ services:
       APP_PORT: 3000
 
   # ==========================================================
+  # INIT — Fix volume permissions for non-root containers
+  # Runs once at startup, sets ownership to 1000:1000
+  # ==========================================================
+  init:
+    image: alpine:3.22
+    user: "0:0"
+    command: >
+      sh -c "
+        chown -R 1000:1000 /data/tor /data/soroban /data/electrs /data/ronin-ui /data/mempool-api 2>/dev/null;
+        mkdir -p /data/tor /data/soroban /data/electrs /data/ronin-ui /data/mempool-api;
+        chown -R 1000:1000 /data/tor /data/soroban /data/electrs /data/ronin-ui /data/mempool-api;
+        echo 'Permissions fixed'
+      "
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+
+  # ==========================================================
   # DATABASE — MariaDB pour stocker les données indexées par Dojo
   # (transactions, adresses suivies, etc.)
   # ==========================================================
@@ -38,6 +55,9 @@ services:
     image: ghcr.io/skyman21m/dojo-tor:1.23.0
     restart: on-failure
     hostname: tor
+    depends_on:
+      init:
+        condition: service_completed_successfully
     command: "/restart.sh"
     environment:
       COMMON_BTC_NETWORK: mainnet
@@ -180,6 +200,9 @@ services:
     restart: on-failure
     stop_grace_period: 1m
     hostname: electrs
+    depends_on:
+      init:
+        condition: service_completed_successfully
     command: "/restart.sh"
     depends_on:
       - tor
@@ -234,6 +257,9 @@ services:
     restart: on-failure
     hostname: soroban
     stop_grace_period: 1m
+    depends_on:
+      init:
+        condition: service_completed_successfully
     environment:
       COMMON_BTC_NETWORK: mainnet
       SOROBAN_INSTALL: "on"
@@ -347,8 +373,12 @@ services:
       - SETUID
       - SETGID
     depends_on:
-      - node
-      - tor
+      init:
+        condition: service_completed_successfully
+      node:
+        condition: service_started
+      tor:
+        condition: service_started
     environment:
       NODE_ENV: production
       JWT_SECRET: ${APP_SEED}_roninui_jwt_secret_pad
