@@ -36,6 +36,7 @@ services:
   # ==========================================================
   tor:
     image: ghcr.io/skyman21m/dojo-tor:1.23.0
+    container_name: ronin-ronindojo_tor_1
     restart: on-failure
     user: "1000:1000"
     hostname: tor
@@ -339,6 +340,7 @@ services:
   # ==========================================================
   ronin-ui:
     image: ghcr.io/skyman21m/ronin-ui:2.6.0
+    container_name: ronin-ronindojo_ronin-ui_1
     restart: on-failure
     user: "0:0"
     hostname: ronin-ui
