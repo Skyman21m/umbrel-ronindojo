@@ -274,21 +274,25 @@ git push origin main
 | `docker: permission denied` | Groupe docker non actif dans la session | Utiliser `sg docker -c "..."` |
 | Settings : boutons ne répondent pas | Fichiers conf absents sur Umbrel | Fix appliqué : `entrypoint.sh` crée les fichiers dans `/app/data/` |
 | Mempool Space "Not installed" | Scripts shell RoninOS absents sur Umbrel | Fix appliqué : 3 services Mempool intégrés dans docker-compose |
-| Container names mismatch après update docker-compose | Docker Compose v2 utilise des tirets au lieu d'underscores | Fix appliqué : `APP_HOST` et `DOCKER_TOR_CONTAINER` mis à jour avec tirets |
+| Container names mismatch après update docker-compose | Docker Compose v1/v2 naming inconsistant | Fix appliqué : `container_name:` fixe dans docker-compose pour ronin-ui et tor |
+| PandoTx "No available Soroban node found" | Variables SOROBAN_ANNOUNCE manquantes dans service node | Fix appliqué : ajout SOROBAN_ANNOUNCE + SOROBAN_ANNOUNCE_KEY_MAIN/TEST dans node |
+| Tor SocksPolicy rejette connexions PandoTx | SocksPolicy hardcodée à 172.28.0.0/16 (réseau RoninOS) | Fix appliqué : tor-restart.sh monté en volume avec `accept 0.0.0.0/0` |
+| Containers en root (user: "0:0") | Volumes créés en root par Docker | Fix appliqué : exports.sh crée les dossiers en 1000:1000 avant le lancement, images rebuildées avec UID 1000 |
 
 ---
 
-## État actuel (2026-04-14)
+## État actuel (2026-04-15)
 
 - App fonctionnelle sur Umbrel Home
-- Tous les services running (node, nginx, db, tor, electrs, explorer, soroban, ronin-ui, mempool_db, mempool_api, mempool_web)
+- 13 containers running (node, nginx, db, tor, electrs, explorer, soroban, ronin-ui, mempool_db, mempool_api, mempool_web, app_proxy, tor_server)
 - Dashboard Ronin-UI complet : Dojo 100%, Bitcoin Core 100%, Indexer 100%
 - Recommended fees OK, uptime Dojo OK, derniers blocs OK
 - Logs fonctionnels
-- Push TX fonctionnel via fallback RPC (Bitcoin Knots local)
+- Push TX fonctionnel via PandoTx (Soroban/Tor) — 150+ pairs trouvés sur le réseau
 - Settings page : boutons fonctionnels (fix entrypoint.sh + conf files dans /app/data/)
-- Mempool Space : intégré et running, URL .onion générée par Tor via `MEMPOOL_INSTALL: "on"` + `NET_MEMPOOL_WEB_IPV4: mempool_web`
-- Soroban/PandoTX : démarre et Tor bootstrappe à 100%, mais ne trouve aucun pair — PandoTX échoue systématiquement avec "No available Soroban node found", fallback RPC utilisé à la place
+- Mempool Space : intégré et running, URL .onion générée par Tor
+- Soroban/PandoTX : fonctionnel, rejoint le réseau P2P, trouve les pairs via bootstrap nodes
+- Sécurité : tor, node, electrs, soroban en user 1000:1000 (plus de root). Ronin-ui en root avec restrictions (cap_drop ALL, no-new-privileges)
 
 ---
 
@@ -305,35 +309,33 @@ La page Settings de Ronin-UI lit/écrit des fichiers `.conf` sur le disque pour 
 
 ---
 
-## Soroban / PandoTX — État et diagnostic
+## Soroban / PandoTX — Fonctionnel
 
 **Architecture :**
 - Ronin-UI ne parle pas directement à Soroban
 - Flux : Ronin-UI → nginx → node (Dojo) → Soroban → bootstrap nodes via Tor
 - Communication node↔soroban via NATS IPC (port 4322) et DNS Docker (`NET_DOJO_SOROBAN_IPV4: soroban`)
 - Soroban utilise son propre Tor interne (127.0.0.1:9050) pour atteindre les bootstrap nodes .onion
+- Le container `node` contacte les pairs distants via `socks5h://tor:9050` (le Tor de Dojo)
 
-**Bootstrap nodes configurés (SOROBAN_P2P_BOOTSTRAP_MAIN) :**
-5 adresses .onion hardcodées dans `docker-compose.yml` (lignes 265-266) — issues du code source RoninDojo v2.3.0 téléchargé depuis Gitea .onion.
+**Bugs corrigés pour faire fonctionner PandoTx :**
 
-**Symptômes observés :**
-- Soroban démarre, Tor bootstrappe à 100%
-- S'annonce toutes les 90 secondes (`level=info msg=Announce`)
-- Aucune connexion aux bootstrap nodes visible dans les logs
-- `SOROBAN_DHT_SERVER_MODE` passé à `"on"` sans effet
-- Mode debug (`SOROBAN_LOG_LEVEL: debug`) non applicable via `docker restart` — nécessite recréation du container avec les variables Umbrel injectées
+1. **Variables manquantes dans le service `node`** — `SOROBAN_ANNOUNCE`, `SOROBAN_ANNOUNCE_KEY_MAIN`, `SOROBAN_ANNOUNCE_KEY_TEST` n'étaient pas dans le service `node`. Sans elles, `keys.index.js` définissait `sorobanKeyAnnounce = undefined`, et `directoryList(undefined)` retournait null → "No available Soroban node found" même avec 150+ pairs dans le répertoire Soroban.
 
-**Conclusion :** impossible de déterminer si le problème est externe (bootstrap nodes hors ligne) ou interne (bug config Soroban sur Umbrel). À investiguer via la communauté RoninDojo.
+2. **SocksPolicy Tor trop restrictive** — Le `restart.sh` de l'image Tor hardcodait `--SocksPolicy "accept 172.28.0.0/16"` (réseau fixe RoninOS). Sur Umbrel, les containers ont des IPs différentes → le container `node` ne pouvait pas utiliser le proxy SOCKS de Tor pour contacter les pairs distants. Fix : montage d'un `tor-restart.sh` modifié avec `--SocksPolicy "accept 0.0.0.0/0"`.
 
-**Config actuelle docker-compose :**
+**Flux PandoTx détaillé :**
 ```
-SOROBAN_DHT_SERVER_MODE: "on"
-SOROBAN_LOG_LEVEL: info
-NODE_PANDOTX_PUSH: "on"
-NODE_PANDOTX_PROCESS: "on"
-NODE_PANDOTX_FALLBACK_MODE: convenient
-NODE_PANDOTX_NB_RETRIES: "2"
+1. node reçoit la TX via POST /pushtx/
+2. node appelle http://soroban:4242/rpc → directoryList("soroban.cluster.mainnet.nodes")
+3. Soroban retourne la liste des pairs (150+ nœuds .onion)
+4. node choisit un pair au hasard
+5. node se connecte au pair via socks5h://tor:9050 (proxy Tor de Dojo)
+6. node envoie la TX au pair distant
+7. Le pair distant broadcast la TX sur le réseau Bitcoin
 ```
+
+**Bootstrap nodes :** 5 adresses .onion hardcodées — tous actifs et joignables (vérifié via curl depuis le container Soroban).
 
 ---
 
@@ -374,11 +376,9 @@ Les boutons install/uninstall dans le dialog Mempool de Ronin-UI ne sont pas fon
 Docker Compose v1 (`docker-compose`) nomme les containers avec **underscores** : `ronin-ronindojo_ronin-ui_1`
 Docker Compose v2 (`docker compose`) nomme avec **tirets** : `ronin-ronindojo-ronin-ui-1`
 
-Umbrel utilise Docker Compose v2. Les références aux noms de containers dans notre config doivent utiliser le format tirets :
-- `APP_HOST: ronin-ronindojo-ronin-ui-1` (pas `_ronin-ui_1`)
-- `DOCKER_TOR_CONTAINER: ronin-ronindojo-tor-1` (pas `_tor_1`)
-
-**Piège :** si on met à jour le docker-compose local sur l'Umbrel (via `curl` depuis GitHub) puis restart, les containers sont recréés avec les nouveaux noms. L'`app_proxy` doit pointer vers le bon nom sinon l'app est inaccessible.
+Le format utilisé dépend du contexte (installation fraîche vs curl + restart). Pour éviter les problèmes, les containers référencés par d'autres (`ronin-ui` et `tor`) utilisent `container_name:` dans le docker-compose pour forcer le nom :
+- `container_name: ronin-ronindojo_ronin-ui_1` → référencé par `APP_HOST`
+- `container_name: ronin-ronindojo_tor_1` → référencé par `DOCKER_TOR_CONTAINER`
 
 ---
 
@@ -398,3 +398,52 @@ Cette méthode recrée tous les containers avec les nouvelles variables/services
 - Cache app store : `/home/umbrel/umbrel/app-stores/skyman21m-umbrel-ronindojo-github-*/ronin-ronindojo/docker-compose.yml`
 
 **Note :** `docker restart` ne relit PAS les env vars — seul un restart via Umbrel ou `docker compose up -d --force-recreate` applique les changements.
+
+---
+
+## Sécurité — Containers non-root
+
+**Standard Umbrel : tous les containers en `user: "1000:1000"`** (UID/GID de l'utilisateur `umbrel`).
+
+**Problème résolu :** Docker crée les sous-dossiers de volumes en `root:root` s'ils n'existent pas. Les containers en UID 1000 ne peuvent pas y écrire → crash au démarrage.
+
+**Solution :** `exports.sh` (exécuté par Umbrel avant `docker compose up`) crée tous les dossiers avec `mkdir -p` et `chown -R 1000:1000`.
+
+**Images rebuildées avec UID 1000:1000 :**
+- `dojo-tor:1.23.0` — build arg `TOR_LINUX_UID=1000 TOR_LINUX_GID=1000`
+- `dojo-nodejs:1.28.2` — Dockerfile custom (`dockerfiles/Dockerfile.node`) : user `node` natif UID 1000, sans group tor séparé
+- `dojo-electrs:1.2.0` — build arg `ELECTRS_LINUX_UID=1000 ELECTRS_LINUX_GID=1000`
+- `dojo-soroban:0.4.2` — Dockerfile custom (`dockerfiles/Dockerfile.soroban`) : un seul user `soroban` UID 1000 pour Tor interne + Soroban
+
+**Tor SocksPolicy :** l'image Tor originale hardcode `--SocksPolicy "accept 172.28.0.0/16"` dans `restart.sh`. Sur Umbrel (réseau différent), le container `node` ne peut pas utiliser le proxy SOCKS. Fix : `tor-restart.sh` monté en volume avec `--SocksPolicy "accept 0.0.0.0/0"`. Le fichier doit être exécutable dans Git et le `command:` utilise `bash /restart.sh` pour contourner les problèmes de permissions d'exécution.
+
+**État par container :**
+
+| Container | User | Restrictions |
+|-----------|------|-------------|
+| `tor` | 1000:1000 | — |
+| `node` | 1000:1000 | — |
+| `electrs` | 1000:1000 | — |
+| `soroban` | 1000:1000 | — |
+| `ronin-ui` | 0:0 (root) | `cap_drop: ALL`, `cap_add: CHOWN/SETUID/SETGID/DAC_OVERRIDE/FOWNER`, `no-new-privileges:true` |
+| `db` | (MariaDB interne) | — |
+| `nginx` | (nginx interne) | — |
+| `explorer` | (Dockerfile USER) | — |
+| `mempool_*` | 1000:1000 | — |
+
+**Pourquoi ronin-ui reste root :** il monte `/var/run/docker.sock` pour lister les containers, lire les logs, vérifier les statuts. Le Docker socket appartient à `root:docker` (GID variable selon l'hôte). Sans root, pas d'accès au socket.
+
+**Commandes de rebuild des images :**
+```bash
+# Tor
+sg docker -c "docker build --build-arg TOR_LINUX_UID=1000 --build-arg TOR_LINUX_GID=1000 -t ghcr.io/skyman21m/dojo-tor:1.23.0 /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/tor"
+
+# Node (Dockerfile custom)
+sg docker -c "docker build -f /home/rd/Documents/GitHub/umbrel-ronindojo/ronin-ronindojo/dockerfiles/Dockerfile.node -t ghcr.io/skyman21m/dojo-nodejs:1.28.2 /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo"
+
+# Electrs
+sg docker -c "docker build --build-arg ELECTRS_LINUX_UID=1000 --build-arg ELECTRS_LINUX_GID=1000 -t ghcr.io/skyman21m/dojo-electrs:1.2.0 /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/electrs"
+
+# Soroban (Dockerfile custom)
+sg docker -c "docker build -f /home/rd/Documents/GitHub/umbrel-ronindojo/ronin-ronindojo/dockerfiles/Dockerfile.soroban -t ghcr.io/skyman21m/dojo-soroban:0.4.2 /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/soroban"
+```
