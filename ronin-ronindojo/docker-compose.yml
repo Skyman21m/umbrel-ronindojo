@@ -39,7 +39,7 @@ services:
     restart: on-failure
     user: "1000:1000"
     hostname: tor
-    command: "/restart.sh"
+    command: "bash /restart.sh"
     environment:
       COMMON_BTC_NETWORK: mainnet
       TOR_SOCKS_PORT: "9050"
