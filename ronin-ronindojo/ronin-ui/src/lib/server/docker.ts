@@ -98,7 +98,7 @@ export const listContainers = pipe(
   taskEither.chain((dockerode) => taskEither.tryCatch(() => dockerode.listContainers({ all: true }), toBoomError(503))),
   taskEither.map(array.filter((containerInfo) => {
     const name = containerInfo.Names.join("").toLowerCase();
-    return CONTAINER_NAME_PATTERNS.some(pattern => name.includes(pattern));
+    return name.includes("ronin-ronindojo") && CONTAINER_NAME_PATTERNS.some(pattern => name.includes(pattern));
   })),
 );
 
