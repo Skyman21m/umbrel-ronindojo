@@ -421,9 +421,10 @@ export const pushTx = (txHex: HexString): taskEither.TaskEither<Boom, AxiosRespo
       pipe(
         taskEither.tryCatch(
           () =>
-            pushTxApi.post<string, AxiosResponse<PushTxResponse>>(`${DOJO_API.PUSHTX.POST.PUSHTX}?at=${token}`, new URLSearchParams({ tx: txHex }), {
+            pushTxApi.post<string, AxiosResponse<PushTxResponse>>(DOJO_API.PUSHTX.POST.PUSHTX, new URLSearchParams({ tx: txHex }), {
               headers: {
                 "Content-Type": "application/x-www-form-urlencoded",
+                "Authorization": `Bearer ${token}`,
               },
             }),
           (e) => {

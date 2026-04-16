@@ -26,6 +26,8 @@ const config = {
   ttl: MAX_AGE,
   cookieOptions: {
     secure: false,
+    sameSite: "strict" as const,
+    httpOnly: true,
   },
 };
 

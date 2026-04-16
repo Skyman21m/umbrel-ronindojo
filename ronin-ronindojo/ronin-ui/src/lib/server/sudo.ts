@@ -26,12 +26,11 @@ export const sudo = (options: SudoOpts) => (password: string) =>
     taskEither.chain(() =>
       taskEither.tryCatch(
         () =>
-          execa("sudo", ["--stdin", "--preserve-env", `bash -c '${options.command}'`], {
+          execa("sudo", ["--stdin", "--preserve-env", "bash", "-c", options.command], {
             ...options.execaOptions,
             stdout: "inherit",
             stderr: "inherit",
             input: password,
-            shell: "/bin/bash",
           }),
         (err) => internal((err as ExecaError).shortMessage),
       ),
@@ -44,12 +43,11 @@ export const unlockSudo = (options: SudoOpts) => (password: string) =>
     taskEither.chain(() =>
       taskEither.tryCatch(
         () =>
-          execa("sudo", ["--stdin", "--preserve-env", `echo '' && bash -c '${options.command}'`], {
+          execa("sudo", ["--stdin", "--preserve-env", "bash", "-c", options.command], {
             ...options.execaOptions,
             stdout: "inherit",
             stderr: "inherit",
             input: password,
-            shell: "/bin/bash",
           }),
         (err) => internal((err as ExecaError).shortMessage),
       ),

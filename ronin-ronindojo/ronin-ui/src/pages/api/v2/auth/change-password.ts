@@ -1,4 +1,3 @@
-import os from "os";
 import { NextApiRequest, NextApiResponse } from "next";
 import { badRequest } from "@hapi/boom";
 import { taskEither, either, string, json } from "fp-ts";
@@ -16,6 +15,7 @@ import { withSessionApi } from "../../../../lib/server/session";
 import { writeDataFile } from "../../../../lib/server/dataFile";
 import { toBoomError } from "../../../../lib/server/to-boom-error";
 import { decryptString } from "../../../../lib/server/decryptString";
+import { comparePasswords, hashPassword } from "../../../../lib/server/password";
 import { RONIN_UI_DATA_FILE } from "../../../../const";
 import { promises as fs } from "fs";
 
@@ -44,7 +44,7 @@ const handler = (req: NextApiRequest, res: NextApiResponse<Response | ErrorRespo
       ),
     ),
     either.chainFirst(({ newPassword }) =>
-      /^\w*$/g.test(newPassword) ? either.right(null) : either.left(badRequest("Password must contain only letters and digits")),
+      newPassword.length >= 8 ? either.right(null) : either.left(badRequest("Password must be at least 8 characters long")),
     ),
     either.chainFirst((reqBody) =>
       string.Eq.equals(reqBody.newPassword, reqBody.repeatNewPassword) ? either.right(null) : either.left(badRequest("New passwords do not match")),
@@ -55,19 +55,34 @@ const handler = (req: NextApiRequest, res: NextApiResponse<Response | ErrorRespo
         taskEither.tryCatch(
           async () => {
             let storedPassword = process.env.APP_PASSWORD || "";
+            let isHashed = false;
             try {
               const data = await fs.readFile(RONIN_UI_DATA_FILE, "utf8");
               const parsed = JSON.parse(data);
-              if (parsed.password) storedPassword = parsed.password;
+              if (parsed.password) {
+                storedPassword = parsed.password;
+                isHashed = storedPassword.includes(":");
+              }
             } catch {}
-            if (currentPassword !== storedPassword) throw new Error("mismatch");
+            if (isHashed) {
+              const match = await comparePasswords(currentPassword)(storedPassword)();
+              if (match._tag !== "Right" || !match.right) throw new Error("mismatch");
+            } else {
+              if (currentPassword !== storedPassword) throw new Error("mismatch");
+            }
           },
           () => badRequest("Old password does not match"),
         ),
       ),
     ),
-    taskEither.chainFirst((reqBody) => writeDataFile({ initialized: true, password: reqBody.newPassword })),
-    taskEither.map((reqBody) => ({ isLoggedIn: true, username: process.env.RONIN_UI_USERNAME || "umbrel", password: reqBody.newPassword })),
+    taskEither.chain((reqBody) =>
+      pipe(
+        hashPassword(reqBody.newPassword),
+        taskEither.mapLeft(() => badRequest("Failed to hash password")),
+        taskEither.chain((hashedPassword) => writeDataFile({ initialized: true, password: hashedPassword })),
+        taskEither.map(() => ({ isLoggedIn: true, username: process.env.RONIN_UI_USERNAME || "umbrel" })),
+      ),
+    ),
     taskEither.chainFirst((userData) =>
       pipe(
         () => {

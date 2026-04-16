@@ -269,7 +269,7 @@ git push origin main
 | Tor en restart loop | `chmod 755` au lieu de `700` sur les hidden services | Fix appliqué dans docker-compose |
 | Barres de progression à 0% | `DOJO_API_URL` avec `/v2/` en trop | Fix appliqué dans docker-compose |
 | Logs ne marchent pas | `getContainer(id)` cherche nom exact, Umbrel préfixe les noms | Fix appliqué : `findContainerByName()` avec pattern matching |
-| Push TX → erreur 404 | `/pushtx/` n'est exposé que via nginx, pas sur `node:8080` direct | Fix appliqué : `pushTxApi` pointe vers `http://nginx/v2/` avec token en query param |
+| Push TX → erreur 404 | `/pushtx/` n'est exposé que via nginx, pas sur `node:8080` direct | Fix appliqué : `pushTxApi` pointe vers `http://nginx/v2/` avec token en header Authorization |
 | Page 404 après vidage navigateur | Cookie de session corrompu | Vider toutes les données du site `192.168.1.30` dans le navigateur |
 | `docker: permission denied` | Groupe docker non actif dans la session | Utiliser `sg docker -c "..."` |
 | Settings : boutons ne répondent pas | Fichiers conf absents sur Umbrel | Fix appliqué : `entrypoint.sh` crée les fichiers dans `/app/data/` |
@@ -286,7 +286,7 @@ git push origin main
 
 ---
 
-## État actuel (2026-04-15)
+## État actuel (2026-04-16)
 
 - App fonctionnelle sur Umbrel Home — prête pour le community store
 - 13 containers running (node, nginx, db, tor, electrs, explorer, soroban, ronin-ui, mempool_db, mempool_api, mempool_web, app_proxy, tor_server)
@@ -301,6 +301,7 @@ git push origin main
 - Sécurité : tor, node, electrs, soroban en user 1000:1000 (plus de root). Ronin-ui en root avec restrictions (cap_drop ALL, no-new-privileges)
 - Auth : APP_PASSWORD pour le login (popup Umbrel), APP_SEED pour l'admin key Dojo (pairing)
 - Containers filtrés par préfixe `ronin-ronindojo` — pas de pollution par les autres apps Umbrel
+- **Audit sécurité appliqué (2026-04-16)** — voir section dédiée ci-dessous
 
 ---
 
@@ -507,3 +508,63 @@ ronin-ui reste en `user: "0:0"` (Docker socket). On a ajouté `cap_drop: ALL` po
 Docker Compose v1 utilise des underscores (`ronin-ronindojo_ronin-ui_1`), v2 des tirets (`ronin-ronindojo-ronin-ui-1`). Le format change selon le contexte (installation fraîche vs `curl` + restart). `APP_HOST` et `DOCKER_TOR_CONTAINER` doivent pointer vers le bon nom sinon l'app est inaccessible.
 
 **Solution :** `container_name:` dans le docker-compose pour forcer un nom fixe, indépendant de la version de Docker Compose.
+
+---
+
+## Audit de sécurité — Corrections appliquées (2026-04-16)
+
+Un audit de sécurité a identifié 11 failles, toutes corrigées dans un seul commit.
+
+### CRITIQUE
+
+**1. Mots de passe stockés en clair → hashés avec scrypt**
+- `ronin-ui.dat` stockait le mot de passe en texte brut, comparé avec `string.Eq.equals()`
+- Le module `password.ts` (scrypt + timingSafeEqual) existait déjà mais n'était jamais utilisé
+- **Fix :** `login.ts`, `change-password.ts`, `set-password.ts` utilisent maintenant `hashPassword()` et `comparePasswords()` de `password.ts`
+- **Migration transparente :** les mots de passe legacy (plaintext) sont détectés par l'absence de `:` (format hash = `salt:hex`). Au login avec un mot de passe legacy, il est automatiquement re-hashé
+- **APP_PASSWORD** (fallback Umbrel) reste en comparaison directe car c'est un HMAC-SHA256 fourni par l'environnement, pas stocké par nous
+
+**2. CORS grand ouvert → restreint à same-origin**
+- `cors()` sans options = `Access-Control-Allow-Origin: *`
+- **Fix :** `cors({ origin: false })` dans `middlewares/v2/index.ts` — n'envoie aucun header CORS, seules les requêtes same-origin fonctionnent
+
+**3. Cookie de session non sécurisé → sameSite + httpOnly**
+- Cookie sans `sameSite` ni `httpOnly`
+- **Fix :** `sameSite: "strict"` + `httpOnly: true` dans `session.ts`. `secure: false` reste car Umbrel = HTTP sur LAN
+
+### HAUT
+
+**4. Route set-password sans auth → protégée**
+- `set-password.ts` ne vérifiait pas `isUserAuthorized(req)`, contrairement à `change-password.ts`
+- **Fix :** ajout de `isUserAuthorized(req)` dans la chaîne de validation
+
+**5. Pas de rate-limiting sur le login → lockout exponentiel**
+- Brute-force trivial sans limitation
+- **Fix :** compteur par IP dans `login.ts`. Après 5 échecs → lockout 1min, puis 2min, 4min, 8min... (max 30min). Reset au login réussi
+
+**6. Regex mot de passe trop restrictive → longueur uniquement**
+- `/^\w*$/g` n'autorisait que `[a-zA-Z0-9_]`
+- **Fix :** validation de longueur >= 8 caractères uniquement — tous les caractères spéciaux autorisés
+
+**7. Mot de passe dans l'objet session → retiré**
+- `change-password.ts` mettait `password: reqBody.newPassword` dans la session
+- **Fix :** corrigé par le fix #1 — la session contient seulement `{ isLoggedIn, username }`
+
+### MOYEN
+
+**8. Credentials Mempool hardcodées → dérivées de APP_PASSWORD**
+- `MYSQL_PASSWORD: mempool` et `MYSQL_ROOT_PASSWORD: mempooladmin` en dur dans docker-compose
+- **Fix :** remplacées par `${APP_PASSWORD}` (HMAC-SHA256 unique par installation)
+- **Note :** nécessite une réinstallation de l'app (la base Mempool est recréée)
+
+**9. Pattern shell dangereux dans sudo.ts → arguments séparés**
+- Interpolation directe `bash -c '${options.command}'` avec `shell: "/bin/bash"`
+- **Fix :** arguments passés séparément à execa (`"bash", "-c", options.command`), sans `shell`
+
+**10. Token Dojo passé en URL → header Authorization**
+- `?at=${token}` dans l'URL de pushTx (visible dans les logs)
+- **Fix :** `Authorization: Bearer ${token}` dans le header. L'API Dojo accepte les deux formats
+
+**11. Données mock en production → garde-fou au démarrage**
+- Si `USE_REAL_DATA` accidentellement `"false"`, le mot de passe mock `fakeRandomPassword` serait utilisé
+- **Fix :** `throw new Error(...)` si on détecte un container Docker (`process.env.HOSTNAME`) avec `useRealData === false`

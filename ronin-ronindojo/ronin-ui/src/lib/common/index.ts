@@ -1,5 +1,10 @@
 export const useRealData = process.env.NODE_ENV === "production" || process.env.USE_REAL_DATA === "true";
 
+// Safety check: refuse to run with mock data in a Docker container (production environment)
+if (!useRealData && typeof window === "undefined" && process.env.HOSTNAME) {
+  throw new Error("FATAL: USE_REAL_DATA is not enabled but this appears to be a production container. Refusing to start with mock data.");
+}
+
 export const delay = (ms: number) =>
   new Promise<void>((resolve) => {
     setTimeout(() => resolve(), ms);
