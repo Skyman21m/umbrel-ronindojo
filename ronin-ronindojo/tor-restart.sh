@@ -9,7 +9,8 @@ echo "## Start tor #############################"
 
 tor_options=(
   --SocksPort "$NET_DOJO_TOR_IPV4:$TOR_SOCKS_PORT"
-  --SocksPolicy "accept 0.0.0.0/0"
+  --SocksPolicy "accept 10.21.0.0/16"
+  --SocksPolicy "reject *"
   --DataDirectory /var/lib/tor/.tor
   --DataDirectoryGroupReadable 1
   --HiddenServiceDir /var/lib/tor/hsv3dojo
