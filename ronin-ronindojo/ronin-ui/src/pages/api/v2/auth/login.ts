@@ -15,7 +15,8 @@ import { readDataFile, writeDataFile } from "../../../../lib/server/dataFile";
 import { decryptString } from "../../../../lib/server/decryptString";
 import { comparePasswords, hashPassword } from "../../../../lib/server/password";
 import { RONIN_UI_DATA_FILE } from "../../../../const";
-import { promises as fs } from "fs";
+import { promises as fs, readFileSync, writeFileSync } from "fs";
+import path from "path";
 
 const RequestBody = t.type({
   password: NonEmptyString,
@@ -25,17 +26,34 @@ export interface Response extends SessionData {}
 
 const methods = "POST";
 
-// Rate limiting: track failed attempts per IP
+// Rate limiting: track failed attempts per IP, persisted to disk
 const MAX_ATTEMPTS = 5;
 const BASE_LOCKOUT_MS = 60 * 1000; // 1 minute
-const failedAttempts = new Map<string, { count: number; lockedUntil: number }>();
+const RATE_LIMIT_FILE = path.join(process.env.RONIN_UI_DATA_DIR || "/app/data", "rate-limits.json");
+
+type RateLimitRecord = { count: number; lockedUntil: number };
+
+const loadRateLimits = (): Map<string, RateLimitRecord> => {
+  try {
+    const data = JSON.parse(readFileSync(RATE_LIMIT_FILE, "utf8"));
+    return new Map(Object.entries(data));
+  } catch {
+    return new Map();
+  }
+};
+
+const saveRateLimits = (map: Map<string, RateLimitRecord>): void => {
+  try {
+    writeFileSync(RATE_LIMIT_FILE, JSON.stringify(Object.fromEntries(map)), "utf8");
+  } catch {}
+};
 
 const getClientIp = (req: NextApiRequest): string =>
-  (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+  req.socket.remoteAddress || "unknown";
 
 const checkRateLimit = (req: NextApiRequest): either.Either<ReturnType<typeof unauthorized>, void> => {
   const ip = getClientIp(req);
-  const record = failedAttempts.get(ip);
+  const record = loadRateLimits().get(ip);
   if (record && record.lockedUntil > Date.now()) {
     const waitSec = Math.ceil((record.lockedUntil - Date.now()) / 1000);
     return either.left(unauthorized(`Too many failed attempts. Try again in ${waitSec}s`));
@@ -45,19 +63,23 @@ const checkRateLimit = (req: NextApiRequest): either.Either<ReturnType<typeof un
 
 const recordFailedAttempt = (req: NextApiRequest): void => {
   const ip = getClientIp(req);
-  const record = failedAttempts.get(ip) || { count: 0, lockedUntil: 0 };
+  const limits = loadRateLimits();
+  const record = limits.get(ip) || { count: 0, lockedUntil: 0 };
   record.count += 1;
   if (record.count >= MAX_ATTEMPTS) {
     // Exponential backoff: 1min, 2min, 4min, 8min... capped at 30min
     const multiplier = Math.min(Math.pow(2, Math.floor(record.count / MAX_ATTEMPTS) - 1), 30);
     record.lockedUntil = Date.now() + BASE_LOCKOUT_MS * multiplier;
   }
-  failedAttempts.set(ip, record);
+  limits.set(ip, record);
+  saveRateLimits(limits);
 };
 
 const clearFailedAttempts = (req: NextApiRequest): void => {
   const ip = getClientIp(req);
-  failedAttempts.delete(ip);
+  const limits = loadRateLimits();
+  limits.delete(ip);
+  saveRateLimits(limits);
 };
 
 const handler = (req: NextApiRequest, res: NextApiResponse<Response | ErrorResponse>): Promise<void> => {
