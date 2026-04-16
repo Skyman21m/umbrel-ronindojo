@@ -339,7 +339,7 @@ services:
   # Seuls les GET sont autorises (list containers, logs, images)
   # ==========================================================
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:0.4.2
+    image: tecnativa/docker-socket-proxy:v0.4.2
     restart: on-failure
     hostname: docker-proxy
     environment:
