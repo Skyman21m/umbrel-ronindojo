@@ -9,13 +9,23 @@ import { readStream } from "./stream-to-promise";
 import { toBoomError } from "./to-boom-error";
 import { useRealData } from "../common";
 
-// Support connection via TCP proxy (DOCKER_HOST=tcp://host:port) or direct socket (dev/fallback)
-const dockerOpts = process.env.DOCKER_HOST
-  ? { host: process.env.DOCKER_HOST.replace(/^tcp:\/\//, "").split(":")[0],
-      port: Number.parseInt(process.env.DOCKER_HOST.replace(/^tcp:\/\//, "").split(":")[1] || "2375") }
-  : { socketPath: "/var/run/docker.sock" };
+// Lazy singleton — evaluated on first call, not at import time.
+// This ensures DOCKER_HOST is read at runtime, not baked in by the Next.js bundler.
+let _dockerode: Dockerode | null = null;
 
-export const getDockerode: io.IO<Dockerode> = io.of(new Dockerode(dockerOpts));
+const getDockerodeInstance = (): Dockerode => {
+  if (!_dockerode) {
+    const dh = process.env.DOCKER_HOST;
+    const opts = dh
+      ? { host: dh.replace(/^tcp:\/\//, "").split(":")[0],
+          port: Number.parseInt(dh.replace(/^tcp:\/\//, "").split(":")[1] || "2375") }
+      : { socketPath: "/var/run/docker.sock" };
+    _dockerode = new Dockerode(opts);
+  }
+  return _dockerode;
+};
+
+export const getDockerode: io.IO<Dockerode> = () => getDockerodeInstance();
 
 // Container name patterns to match — on Umbrel containers are named ronin-ronindojo_<service>_1
 const CONTAINER_NAME_PATTERNS = [
