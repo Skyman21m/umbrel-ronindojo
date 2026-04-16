@@ -524,9 +524,10 @@ Un audit de sécurité a identifié 11 failles, toutes corrigées dans un seul c
 - **Migration transparente :** les mots de passe legacy (plaintext) sont détectés par l'absence de `:` (format hash = `salt:hex`). Au login avec un mot de passe legacy, il est automatiquement re-hashé
 - **APP_PASSWORD** (fallback Umbrel) reste en comparaison directe car c'est un HMAC-SHA256 fourni par l'environnement, pas stocké par nous
 
-**2. CORS grand ouvert → restreint à same-origin**
+**2. CORS grand ouvert → middleware supprimé**
 - `cors()` sans options = `Access-Control-Allow-Origin: *`
-- **Fix :** `cors({ origin: false })` dans `middlewares/v2/index.ts` — n'envoie aucun header CORS, seules les requêtes same-origin fonctionnent
+- **Fix :** middleware `cors()` supprimé de `middlewares/v2/index.ts`. Sur Umbrel, tout est same-origin (pas besoin de CORS). La protection contre les requêtes cross-origin est assurée par `sameSite: "strict"` sur le cookie de session (fix #3)
+- **Note :** `cors({ origin: false })` a été tenté mais cassait les appels API client-side (SWR) avec des erreurs 500 sur toutes les routes
 
 **3. Cookie de session non sécurisé → sameSite + httpOnly**
 - Cookie sans `sameSite` ni `httpOnly`
