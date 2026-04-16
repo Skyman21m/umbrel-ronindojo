@@ -107,7 +107,7 @@ services:
       # Dojo API keys
       NODE_API_KEY: ${APP_SEED}
       NODE_ADMIN_KEY: ${APP_PASSWORD}
-      NODE_JWT_SECRET: ${APP_SEED}_jwt
+      NODE_JWT_SECRET: ${APP_PASSWORD}_dojo_jwt
       NODE_ACTIVE_INDEXER: local_indexer
       NODE_FEE_TYPE: ECONOMICAL
       NODE_GAP_EXTERNAL: "100"
