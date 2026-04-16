@@ -15,7 +15,9 @@ export const BITCOIND_CONFIG_PATH = process.env.BITCOIND_CONFIG_PATH || "/app/da
 export const EXPLORER_CONFIG_PATH = process.env.EXPLORER_CONFIG_PATH || path.join(DOJO_DIR_PATH, "conf", "docker-explorer.conf");
 export const DOJO_ENV_PATH = path.join(DOJO_DIR_PATH, ".env");
 export const PM2_LOG_PATH = path.join(process.cwd(), "logs", "combined.log");
-export const RONIN_UI_DATA_FILE = path.join(process.cwd(), "ronin-ui.dat");
+export const RONIN_UI_DATA_FILE = process.env.RONIN_UI_DATA_DIR
+  ? path.join(process.env.RONIN_UI_DATA_DIR, "ronin-ui.dat")
+  : path.join(process.cwd(), "ronin-ui.dat");
 export const RONINDOJO_DIR = path.join(HOME_DIR, "RoninDojo");
 export const RONINDOJO_FUNCTIONS = path.join(RONINDOJO_DIR, "Scripts", "functions.sh");
 export const RONINDOJO_UPGRADE_SCRIPT = path.join(RONINDOJO_DIR, "Scripts", "Api", "System", "ronindojo-upgrade.sh");
