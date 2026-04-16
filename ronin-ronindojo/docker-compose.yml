@@ -334,6 +334,23 @@ services:
       BACKEND_MAINNET_HTTP_HOST: mempool_api
 
   # ==========================================================
+  # DOCKER-PROXY — Proxy Docker socket en lecture seule
+  # Evite de monter le socket Docker directement dans ronin-ui
+  # Seuls les GET sont autorises (list containers, logs, images)
+  # ==========================================================
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.4.2
+    restart: on-failure
+    hostname: docker-proxy
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      SYSTEM: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # ==========================================================
   # RONIN-UI — Dashboard Next.js
   # Interface graphique complète pour gérer Dojo
   # Remplace le Maintenance Tool basique
@@ -342,21 +359,16 @@ services:
     image: ghcr.io/skyman21m/ronin-ui:2.6.0
     container_name: ronin-ronindojo_ronin-ui_1
     restart: on-failure
-    user: "0:0"
+    user: "1001:1001"
     hostname: ronin-ui
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    cap_add:
-      - CHOWN
-      - SETUID
-      - SETGID
-      - DAC_OVERRIDE
-      - FOWNER
     depends_on:
       - node
       - tor
+      - docker-proxy
     environment:
       NODE_ENV: production
       JWT_SECRET: ${APP_SEED}_roninui_jwt_secret_pad
@@ -375,14 +387,14 @@ services:
       BITCOIND_RPC_PORT: ${APP_BITCOIN_RPC_PORT}
       BITCOIND_RPC_USER: ${APP_BITCOIN_RPC_USER}
       BITCOIND_RPC_PASSWORD: ${APP_BITCOIN_RPC_PASS}
-      # Docker container names for exec
+      # Docker container names (kept for log lookups)
       DOCKER_TOR_CONTAINER: ronin-ronindojo_tor_1
       # Default login password (from Umbrel, shown in "Default credentials")
       APP_PASSWORD: ${APP_PASSWORD}
       # Tor data dir mounted read-only for reading .onion hostnames
-      # (replaces docker exec calls into the tor container)
       TOR_DATA_DIR: /tor-data
+      # Docker API via read-only proxy (no direct socket access)
+      DOCKER_HOST: tcp://docker-proxy:2375
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${APP_DATA_DIR}/data/ronin-ui:/app/data
       - ${APP_DATA_DIR}/data/tor:/tor-data:ro
