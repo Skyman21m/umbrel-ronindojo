@@ -16,7 +16,7 @@ services:
   # (transactions, adresses suivies, etc.)
   # ==========================================================
   db:
-    image: ghcr.io/skyman21m/dojo-db:1.7.0
+    image: ghcr.io/skyman21m/dojo-db:1.7.0@sha256:984c832f5f6e29920c08ea018fa652d9062873fcec155450b11148344fa31d90
     restart: on-failure
     hostname: db
     stop_grace_period: 1m
@@ -35,7 +35,7 @@ services:
   # Les NET_*_IPV4 pour les autres services = noms Docker (routage)
   # ==========================================================
   tor:
-    image: ghcr.io/skyman21m/dojo-tor:1.23.0
+    image: ghcr.io/skyman21m/dojo-tor:1.23.0@sha256:daf6c8ecdbe29e2a49073125f10f2e3660be8e0f012002fc5ecfc9915fc28490
     container_name: ronin-ronindojo_tor_1
     restart: on-failure
     user: "1000:1000"
@@ -81,7 +81,7 @@ services:
   # Se connecte au Bitcoin Node d'Umbrel via RPC
   # ==========================================================
   node:
-    image: ghcr.io/skyman21m/dojo-nodejs:1.28.2
+    image: ghcr.io/skyman21m/dojo-nodejs:1.28.2@sha256:ddcec2645cd81dcc6358b3d2d24cf8529ca4902afd7797679fc97ffbc4fb7dac
     restart: on-failure
     user: "1000:1000"
     hostname: node
@@ -163,7 +163,7 @@ services:
   # app_proxy d'Umbrel redirige vers ce service sur le port 80
   # ==========================================================
   nginx:
-    image: ghcr.io/skyman21m/dojo-nginx:1.9.0
+    image: ghcr.io/skyman21m/dojo-nginx:1.9.0@sha256:3ac46c589e3119778c87eec77010b536f14799e41ba10e5b37eac372bb9b622a
     restart: on-failure
     hostname: nginx
     depends_on:
@@ -179,7 +179,7 @@ services:
   # Première indexation : plusieurs heures
   # ==========================================================
   electrs:
-    image: ghcr.io/skyman21m/dojo-electrs:1.2.0
+    image: ghcr.io/skyman21m/dojo-electrs:1.2.0@sha256:6555c5a48527daa24f9aaf9e8e1592f643ac71d1ec812791ba28fe20d0824405
     restart: on-failure
     user: "1000:1000"
     stop_grace_period: 1m
@@ -211,7 +211,7 @@ services:
   # EXPLORER — Explorateur de blocs (btc-rpc-explorer)
   # ==========================================================
   explorer:
-    image: ghcr.io/skyman21m/dojo-explorer:3.5.1
+    image: ghcr.io/skyman21m/dojo-explorer:3.5.1@sha256:9a7858f5d0be3ceda642c1b8619f666b079db75ad0776054c93b0d237092bce3
     restart: on-failure
     hostname: explorer
     command: "/home/node/app/restart.sh"
@@ -234,7 +234,7 @@ services:
   # Broadcast de transactions P2P pour CoinJoin Whirlpool
   # ==========================================================
   soroban:
-    image: ghcr.io/skyman21m/dojo-soroban:0.4.2
+    image: ghcr.io/skyman21m/dojo-soroban:0.4.2@sha256:58f408262da9f567de245b910b715a495172fd89785c8f2689e07c6b16aa7eeb
     restart: on-failure
     user: "1000:1000"
     hostname: soroban
@@ -278,7 +278,7 @@ services:
   # 3 services : base de données, API backend, frontend web
   # ==========================================================
   mempool_db:
-    image: mariadb:10.5.8
+    image: mariadb:10.5.8@sha256:8040983db146f729749081c6b216a19d52e0973134e2e34c0b4fd87f48bc15b0
     restart: on-failure
     hostname: mempool_db
     stop_grace_period: 1m
@@ -291,7 +291,7 @@ services:
       - ${APP_DATA_DIR}/data/mempool-db:/var/lib/mysql
 
   mempool_api:
-    image: mempool/backend:v2.4.0
+    image: mempool/backend:v2.4.0@sha256:6036cc6866b782efadc765e8189958940202b3fa1770eb35c35210c86efd2f47
     restart: on-failure
     hostname: mempool_api
     stop_grace_period: 1m
@@ -321,7 +321,7 @@ services:
       - ${APP_DATA_DIR}/data/mempool-api:/backend/cache
 
   mempool_web:
-    image: mempool/frontend:v2.4.0
+    image: mempool/frontend:v2.4.0@sha256:f71722f1e3abfb3d8a3df6f2a32e384d39434e311bb83d810629077b4fa6ffaf
     restart: on-failure
     hostname: mempool_web
     stop_grace_period: 1m
@@ -339,7 +339,7 @@ services:
   # Seuls les GET sont autorises (list containers, logs, images)
   # ==========================================================
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:v0.4.2
+    image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
     restart: on-failure
     hostname: docker-proxy
     environment:
@@ -356,7 +356,7 @@ services:
   # Remplace le Maintenance Tool basique
   # ==========================================================
   ronin-ui:
-    image: ghcr.io/skyman21m/ronin-ui:2.6.0
+    image: ghcr.io/skyman21m/ronin-ui:2.6.0@sha256:441b3bd86178384516efdb595110181df0accf8a5aac608af747fdc36bca17c0
     container_name: ronin-ronindojo_ronin-ui_1
     restart: on-failure
     user: "1000:1000"
