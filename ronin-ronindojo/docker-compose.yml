@@ -106,7 +106,7 @@ services:
       BITCOIND_ZMQ_BLK_HASH: ${APP_BITCOIN_ZMQ_HASHBLOCK_PORT}
       # Dojo API keys
       NODE_API_KEY: ${APP_SEED}
-      NODE_ADMIN_KEY: ${APP_SEED}
+      NODE_ADMIN_KEY: ${APP_PASSWORD}
       NODE_JWT_SECRET: ${APP_SEED}_jwt
       NODE_ACTIVE_INDEXER: local_indexer
       NODE_FEE_TYPE: ECONOMICAL
@@ -368,7 +368,7 @@ services:
       # Dojo API
       DOJO_API_URL: http://node:8080/
       NODE_API_KEY: ${APP_SEED}
-      NODE_ADMIN_KEY: ${APP_SEED}
+      NODE_ADMIN_KEY: ${APP_PASSWORD}
       DOJO_VERSION_TAG: "1.28.2"
       # Bitcoin RPC
       BITCOIND_RPC_HOST: ${APP_BITCOIN_NODE_IP}
