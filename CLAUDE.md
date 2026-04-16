@@ -283,6 +283,8 @@ git push origin main
 | Pairing : "Couldn't determine indexer type" | Nom exact `/electrs` ne matche pas `ronin-ronindojo_electrs_1` | Fix appliqué : pattern matching (`name.includes`) dans `indexer-type.ts` |
 | Pairing : "Samourai Wallet" mentionné | Branding obsolète (Samourai Wallet n'existe plus) | Fix appliqué : renommé en "Dojo" / "wallet" dans `pairing.tsx` |
 | Dashboard : "Bitcoin Core" hardcodé | Pas de détection du client Bitcoin utilisé | Fix appliqué : appel RPC `getnetworkinfo` pour lire `subversion` et afficher Core/Knots/Libre dynamiquement |
+| Dojo 0% et "not running" après curl+restart | Docker Compose v2 nomme avec tirets (`-node-`) au lieu d'underscores (`_node_`) | Fix appliqué : ajout pattern `-node-` dans `dashboard.tsx` et `status.ts` |
+| `cors({ origin: false })` casse les appels SWR | Le middleware CORS bloquait toutes les requêtes API client-side → 500 | Fix appliqué : middleware CORS supprimé, protection cross-origin via `sameSite: strict` sur le cookie |
 
 ---
 
