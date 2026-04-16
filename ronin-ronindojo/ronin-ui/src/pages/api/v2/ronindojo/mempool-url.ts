@@ -1,3 +1,4 @@
+import { promises as fs } from "fs";
 import { NextApiRequest, NextApiResponse } from "next";
 import { pipe } from "fp-ts/function";
 import { either, task, taskEither, string } from "fp-ts";
@@ -8,8 +9,10 @@ import { isUserAuthorized } from "../../../../lib/server/isUserAuthorized";
 import { sendSuccessTask } from "../../../../lib/server/successResponse";
 import { withV2Middlewares } from "../../../../middlewares/v2";
 import { withSessionApi } from "../../../../lib/server/session";
-import { execAndGetResultFromTor } from "../../../../lib/server/docker";
+import { toBoomError } from "../../../../lib/server/to-boom-error";
 import { useRealData } from "../../../../lib/common";
+
+const TOR_DATA_DIR = process.env.TOR_DATA_DIR || "/var/lib/tor";
 
 export interface Response {
   url: string | null;
@@ -18,7 +21,7 @@ export interface Response {
 export const getMempoolUrl: task.Task<Response> = pipe(
   useRealData
     ? pipe(
-        execAndGetResultFromTor({ Cmd: ["cat", "/var/lib/tor/hsv3mempool/hostname"] }),
+        taskEither.tryCatch(() => fs.readFile(`${TOR_DATA_DIR}/hsv3mempool/hostname`, "utf8"), toBoomError(503)),
         taskEither.map(string.trim),
         taskEither.chain((dojoUrl) => (dojoUrl.includes(".onion") ? taskEither.right(dojoUrl) : taskEither.left(new Error("Mempool URL could not be read")))),
         taskEither.mapLeft((err) => {

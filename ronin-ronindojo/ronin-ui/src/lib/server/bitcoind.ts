@@ -1,3 +1,4 @@
+import { promises as fs } from "fs";
 import { RPCClient } from "@samouraiwallet/bitcoin-rpc";
 import { Boom, serverUnavailable } from "@hapi/boom";
 import { option, io, taskEither, apply, string } from "fp-ts";
@@ -6,7 +7,6 @@ import { pipe } from "fp-ts/function";
 import { getValue } from "./config-utils";
 import { BITCOIND_CONFIG_PATH } from "../../const";
 import { toBoomError } from "./to-boom-error";
-import { execAndGetResultFromTor } from "./docker";
 
 const BITCOIND_RPC_HOST = process.env.BITCOIND_RPC_HOST || "127.0.0.1";
 const BITCOIND_RPC_PORT = Number.parseInt(process.env.BITCOIND_RPC_PORT || "28256", 10);
@@ -112,8 +112,10 @@ const createBitcoindRpcClient =
     return client;
   };
 
+const TOR_DATA_DIR = process.env.TOR_DATA_DIR || "/var/lib/tor";
+
 export const getBitcoindV3Url: taskEither.TaskEither<Boom, string> = pipe(
-  execAndGetResultFromTor({ Cmd: ["cat", "/var/lib/tor/hsv3bitcoind/hostname"] }),
+  taskEither.tryCatch(() => fs.readFile(`${TOR_DATA_DIR}/hsv3bitcoind/hostname`, "utf8"), toBoomError(503)),
   taskEither.map(string.trim),
   taskEither.chain((bitcoind) =>
     bitcoind.includes(".onion") ? taskEither.right(bitcoind) : taskEither.left(serverUnavailable("Bitcoind URL could not be read")),

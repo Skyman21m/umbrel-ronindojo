@@ -379,6 +379,10 @@ services:
       DOCKER_TOR_CONTAINER: ronin-ronindojo_tor_1
       # Default login password (from Umbrel, shown in "Default credentials")
       APP_PASSWORD: ${APP_PASSWORD}
+      # Tor data dir mounted read-only for reading .onion hostnames
+      # (replaces docker exec calls into the tor container)
+      TOR_DATA_DIR: /tor-data
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${APP_DATA_DIR}/data/ronin-ui:/app/data
+      - ${APP_DATA_DIR}/data/tor:/tor-data:ro

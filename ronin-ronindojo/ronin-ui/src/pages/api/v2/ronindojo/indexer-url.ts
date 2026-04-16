@@ -1,3 +1,4 @@
+import { promises as fs } from "fs";
 import { NextApiRequest, NextApiResponse } from "next";
 import { pipe } from "fp-ts/function";
 import { either, task, taskEither, string } from "fp-ts";
@@ -9,9 +10,11 @@ import { sendSuccessTask } from "../../../../lib/server/successResponse";
 import { withV2Middlewares } from "../../../../middlewares/v2";
 import { withSessionApi } from "../../../../lib/server/session";
 import { getIndexerType, IndexerType } from "./indexer-type";
-import { execAndGetResultFromTor } from "../../../../lib/server/docker";
+import { toBoomError } from "../../../../lib/server/to-boom-error";
 import { Boom } from "@hapi/boom";
 import { useRealData } from "../../../../lib/common";
+
+const TOR_DATA_DIR = process.env.TOR_DATA_DIR || "/var/lib/tor";
 
 export interface Response {
   url: string | null;
@@ -20,9 +23,9 @@ export interface Response {
 const matchIndexer = (indexerType: IndexerType): taskEither.TaskEither<Boom, string | null> => {
   switch (indexerType) {
     case "Fulcrum":
-      return pipe(execAndGetResultFromTor({ Cmd: ["cat", "/var/lib/tor/hsv3fulcrum/hostname"] }), taskEither.map(string.trim));
+      return pipe(taskEither.tryCatch(() => fs.readFile(`${TOR_DATA_DIR}/hsv3fulcrum/hostname`, "utf8"), toBoomError(503)), taskEither.map(string.trim));
     case "Electrs":
-      return pipe(execAndGetResultFromTor({ Cmd: ["cat", "/var/lib/tor/hsv3electrs/hostname"] }), taskEither.map(string.trim));
+      return pipe(taskEither.tryCatch(() => fs.readFile(`${TOR_DATA_DIR}/hsv3electrs/hostname`, "utf8"), toBoomError(503)), taskEither.map(string.trim));
     default:
       return taskEither.right(null);
   }
