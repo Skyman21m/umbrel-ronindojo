@@ -359,7 +359,7 @@ services:
     image: ghcr.io/skyman21m/ronin-ui:2.6.0
     container_name: ronin-ronindojo_ronin-ui_1
     restart: on-failure
-    user: "1001:1001"
+    user: "1000:1000"
     hostname: ronin-ui
     security_opt:
       - no-new-privileges:true
