@@ -41,7 +41,7 @@ const getRoninDojoServiceStatus: task.Task<RoninDojoStatus> = apply.sequenceS(ta
           either.map(
             flow(
               ROA.findFirst((container) =>
-                container.Names.join("").includes("nodejs") || container.Names.join("").includes("_node_"),
+                container.Names.join("").includes("nodejs") || container.Names.join("").includes("_node_") || container.Names.join("").includes("-node-"),
               ),
               option.map((container) => container.State.toLowerCase() === "running"),
               option.getOrElse(constFalse),

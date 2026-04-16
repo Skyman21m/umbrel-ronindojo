@@ -165,7 +165,7 @@ const DashboardPage: NextPage<Props> = ({
   })();
 
   const isDbRunning = Boolean(containerInfoData?.find((c) => nameIncludes(c, "db"))?.State.toLowerCase() === "running");
-  const isNodejsRunning = Boolean(containerInfoData?.find((c) => nameIncludes(c, "nodejs") || nameIncludes(c, "_node_") || nameIncludes(c, "_node-"))?.State.toLowerCase() === "running");
+  const isNodejsRunning = Boolean(containerInfoData?.find((c) => nameIncludes(c, "nodejs") || nameIncludes(c, "_node_") || nameIncludes(c, "_node-") || nameIncludes(c, "-node-"))?.State.toLowerCase() === "running");
   const isBitcoindRunning = true; // On Umbrel, Bitcoin is managed externally
   const isIndexerRunning = Boolean(
     containerInfoData
