@@ -24,13 +24,14 @@ if (!jwtSecret || jwtSecret.length < 32) {
 }
 
 const ContentSecurityPolicy = `
-  default-src data: 'self';
+  default-src 'self';
+  img-src data: 'self';
   media-src data: 'self';
   script-src 'self' 'unsafe-inline';
   child-src 'self';
   style-src 'unsafe-inline' 'self';
   font-src 'self';
-  frame-ancestors *
+  frame-ancestors 'self'
 `;
 
 const securityHeaders = [
