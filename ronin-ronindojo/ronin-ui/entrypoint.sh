@@ -20,4 +20,24 @@ if [ ! -f "/app/data/ronin-ui.dat" ]; then
   printf '{"initialized":true}' > "/app/data/ronin-ui.dat"
 fi
 
+# Generate RSA keypair on first run (unique per installation).
+# On RoninOS the keypair was generated at build time, but since we distribute
+# a shared Docker image via ghcr.io, all installations would share the same key.
+# Generating at runtime ensures each Umbrel instance has its own keypair.
+if [ ! -f "/app/data/rsa-private.pem" ]; then
+  node -e "
+    const crypto = require('crypto');
+    const fs = require('fs');
+    const kp = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs1', format: 'pem' }
+    });
+    fs.writeFileSync('/app/data/rsa-private.pem', kp.privateKey);
+    fs.writeFileSync('/app/data/rsa-public.pem', kp.publicKey);
+  "
+fi
+export RSA_PRIVATE_KEY_PATH=/app/data/rsa-private.pem
+export RSA_PUBLIC_KEY_PATH=/app/data/rsa-public.pem
+
 exec node server.js

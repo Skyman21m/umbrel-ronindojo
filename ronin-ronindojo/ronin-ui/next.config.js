@@ -48,11 +48,25 @@ const securityHeaders = [
   },
 ];
 
-const keyPair = crypto.generateKeyPairSync("rsa", {
-  modulusLength: 2048,
-  publicKeyEncoding: { type: "spki", format: "pem" },
-  privateKeyEncoding: { type: "pkcs1", format: "pem" },
-});
+const fs = require("fs");
+
+// In production (Docker), the RSA keypair is generated at first startup by
+// entrypoint.sh and persisted in /app/data/. This ensures each Umbrel
+// installation has its own unique keypair instead of sharing the build-time key.
+// In development, fall back to generating a keypair at build time.
+let keyPair;
+if (process.env.RSA_PRIVATE_KEY_PATH && fs.existsSync(process.env.RSA_PRIVATE_KEY_PATH)) {
+  keyPair = {
+    privateKey: fs.readFileSync(process.env.RSA_PRIVATE_KEY_PATH, "utf8"),
+    publicKey: fs.readFileSync(process.env.RSA_PUBLIC_KEY_PATH, "utf8"),
+  };
+} else {
+  keyPair = crypto.generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs1", format: "pem" },
+  });
+}
 
 /**
  * @type {import("next").NextConfig}
