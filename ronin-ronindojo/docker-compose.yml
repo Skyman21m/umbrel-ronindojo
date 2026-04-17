@@ -95,7 +95,7 @@ services:
       - db
     command: "/home/node/app/wait-for-it.sh db:3306 --timeout=720 --strict -- /home/node/app/restart.sh"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/"]
+      test: ["CMD", "nc", "-z", "127.0.0.1", "8080"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -182,7 +182,7 @@ services:
       - node
     command: "/wait-for node:8080 --timeout=720 -- nginx"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+      test: ["CMD", "nc", "-z", "127.0.0.1", "80"]
       interval: 30s
       timeout: 10s
       retries: 3
