@@ -25,6 +25,12 @@ services:
       MYSQL_DATABASE: samourai-main
       MYSQL_USER: samourai
       MYSQL_PASSWORD: ${APP_RONINDOJO_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=${APP_RONINDOJO_DB_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     volumes:
       - ${APP_DATA_DIR}/data/mysql:/var/lib/mysql
 
@@ -88,6 +94,12 @@ services:
     depends_on:
       - db
     command: "/home/node/app/wait-for-it.sh db:3306 --timeout=720 --strict -- /home/node/app/restart.sh"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
     environment:
       COMMON_BTC_NETWORK: mainnet
       DOJO_VERSION_TAG: "1.28.2"
@@ -169,6 +181,12 @@ services:
     depends_on:
       - node
     command: "/wait-for node:8080 --timeout=720 -- nginx"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
     environment:
       COMMON_BTC_NETWORK: mainnet
       EXPLORER_INSTALL: "on"
