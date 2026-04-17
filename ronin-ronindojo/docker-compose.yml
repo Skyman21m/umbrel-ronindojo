@@ -16,7 +16,7 @@ services:
   # (transactions, adresses suivies, etc.)
   # ==========================================================
   db:
-    image: ghcr.io/skyman21m/dojo-db:1.7.0@sha256:984c832f5f6e29920c08ea018fa652d9062873fcec155450b11148344fa31d90
+    image: ghcr.io/skyman21m/dojo-db:1.7.0@sha256:fc53dfeb648b812fb5e2482bc80cbcbeb86f3a0dc829afeabae6fbb9882c593e
     restart: on-failure
     hostname: db
     stop_grace_period: 1m
@@ -41,7 +41,7 @@ services:
   # Les NET_*_IPV4 pour les autres services = noms Docker (routage)
   # ==========================================================
   tor:
-    image: ghcr.io/skyman21m/dojo-tor:1.23.0@sha256:daf6c8ecdbe29e2a49073125f10f2e3660be8e0f012002fc5ecfc9915fc28490
+    image: ghcr.io/skyman21m/dojo-tor:1.23.0@sha256:3da25195d67fc9d4421be5862bb291d4f95e5f9f655eba4a593a9e3284921543
     container_name: ronin-ronindojo_tor_1
     restart: on-failure
     user: "1000:1000"
@@ -87,7 +87,7 @@ services:
   # Se connecte au Bitcoin Node d'Umbrel via RPC
   # ==========================================================
   node:
-    image: ghcr.io/skyman21m/dojo-nodejs:1.28.2@sha256:ddcec2645cd81dcc6358b3d2d24cf8529ca4902afd7797679fc97ffbc4fb7dac
+    image: ghcr.io/skyman21m/dojo-nodejs:1.28.2@sha256:707d7a8f159611f3af0724a0d2418c23a25d91830a852a61a32815d700283d76
     restart: on-failure
     user: "1000:1000"
     hostname: node
@@ -175,7 +175,7 @@ services:
   # app_proxy d'Umbrel redirige vers ce service sur le port 80
   # ==========================================================
   nginx:
-    image: ghcr.io/skyman21m/dojo-nginx:1.9.0@sha256:3ac46c589e3119778c87eec77010b536f14799e41ba10e5b37eac372bb9b622a
+    image: ghcr.io/skyman21m/dojo-nginx:1.9.0@sha256:385252cea1b3250bf275e142b6e2224eebbb9173169090afc96eeee53954fa21
     restart: on-failure
     hostname: nginx
     depends_on:
@@ -197,7 +197,7 @@ services:
   # Première indexation : plusieurs heures
   # ==========================================================
   electrs:
-    image: ghcr.io/skyman21m/dojo-electrs:1.2.0@sha256:6555c5a48527daa24f9aaf9e8e1592f643ac71d1ec812791ba28fe20d0824405
+    image: ghcr.io/skyman21m/dojo-electrs:1.2.0@sha256:ada9ad99cd933ffd416bf482ca19bbbf32b3736c6071686913ee8caf0d2459bd
     restart: on-failure
     user: "1000:1000"
     stop_grace_period: 1m
@@ -229,7 +229,7 @@ services:
   # EXPLORER — Explorateur de blocs (btc-rpc-explorer)
   # ==========================================================
   explorer:
-    image: ghcr.io/skyman21m/dojo-explorer:3.5.1@sha256:9a7858f5d0be3ceda642c1b8619f666b079db75ad0776054c93b0d237092bce3
+    image: ghcr.io/skyman21m/dojo-explorer:3.5.1@sha256:8dcdf666b25042e77cf920fc08c6f71d3a86ae42eb4730fd1e4ad2b7c91bddfc
     restart: on-failure
     hostname: explorer
     command: "/home/node/app/restart.sh"
@@ -252,7 +252,7 @@ services:
   # Broadcast de transactions P2P pour CoinJoin Whirlpool
   # ==========================================================
   soroban:
-    image: ghcr.io/skyman21m/dojo-soroban:0.4.2@sha256:58f408262da9f567de245b910b715a495172fd89785c8f2689e07c6b16aa7eeb
+    image: ghcr.io/skyman21m/dojo-soroban:0.4.2@sha256:6373eab72e334099b9e48cd7bfd27e6f2b705ab1b1de48cba01acdb9e965fd52
     restart: on-failure
     user: "1000:1000"
     hostname: soroban
@@ -374,7 +374,7 @@ services:
   # Remplace le Maintenance Tool basique
   # ==========================================================
   ronin-ui:
-    image: ghcr.io/skyman21m/ronin-ui:2.6.0@sha256:441b3bd86178384516efdb595110181df0accf8a5aac608af747fdc36bca17c0
+    image: ghcr.io/skyman21m/ronin-ui:2.6.0@sha256:4fa03c11d507c60dc65998faf234a2a75280e5cd0dadc3a3501f129609c8e568
     container_name: ronin-ronindojo_ronin-ui_1
     restart: on-failure
     user: "1000:1000"
