@@ -21,10 +21,10 @@ services:
     hostname: db
     stop_grace_period: 1m
     environment:
-      MYSQL_ROOT_PASSWORD: ${APP_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${APP_RONINDOJO_DB_PASSWORD}
       MYSQL_DATABASE: samourai-main
       MYSQL_USER: samourai
-      MYSQL_PASSWORD: ${APP_PASSWORD}
+      MYSQL_PASSWORD: ${APP_RONINDOJO_DB_PASSWORD}
     volumes:
       - ${APP_DATA_DIR}/data/mysql:/var/lib/mysql
 
@@ -94,8 +94,8 @@ services:
       # MySQL
       MYSQL_DATABASE: samourai-main
       MYSQL_USER: samourai
-      MYSQL_PASSWORD: ${APP_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${APP_PASSWORD}
+      MYSQL_PASSWORD: ${APP_RONINDOJO_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${APP_RONINDOJO_DB_PASSWORD}
       # Bitcoin RPC — connecté au nœud Umbrel
       BITCOIND_INSTALL: "off"
       BITCOIND_IP: ${APP_BITCOIN_NODE_IP}
@@ -285,8 +285,8 @@ services:
     environment:
       MYSQL_DATABASE: mempool
       MYSQL_USER: mempool
-      MYSQL_PASSWORD: ${APP_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${APP_PASSWORD}
+      MYSQL_PASSWORD: ${APP_RONINDOJO_MEMPOOL_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${APP_RONINDOJO_MEMPOOL_DB_PASSWORD}
     volumes:
       - ${APP_DATA_DIR}/data/mempool-db:/var/lib/mysql
 
@@ -313,7 +313,7 @@ services:
       DATABASE_PORT: "3306"
       DATABASE_DATABASE: mempool
       DATABASE_USERNAME: mempool
-      DATABASE_PASSWORD: ${APP_PASSWORD}
+      DATABASE_PASSWORD: ${APP_RONINDOJO_MEMPOOL_DB_PASSWORD}
       MEMPOOL_HTTP_PORT: "8999"
       MEMPOOL_CACHE_DIR: "/backend/cache"
       MEMPOOL_CLEAR_PROTECTION_MINUTES: "20"

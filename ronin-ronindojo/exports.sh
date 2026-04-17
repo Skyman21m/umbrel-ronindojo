@@ -2,6 +2,10 @@
 # C'est sur ce port que l'app est accessible dans Umbrel
 export APP_RONINDOJO_NGINX_PORT="8080"
 
+# Derive distinct passwords per service to avoid single-secret-compromises-all
+export APP_RONINDOJO_DB_PASSWORD="${APP_PASSWORD}_dojodb"
+export APP_RONINDOJO_MEMPOOL_DB_PASSWORD="${APP_PASSWORD}_mempooldb"
+
 # Create data directories with correct ownership (1000:1000 = umbrel)
 # Docker would create them as root if they don't exist
 if [ -n "${APP_DATA_DIR:-}" ]; then
