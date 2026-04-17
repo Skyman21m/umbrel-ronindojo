@@ -364,7 +364,7 @@ Sur RoninOS, Mempool Space est un composant optionnel installé via des scripts 
 **Config Tor :**
 - `MEMPOOL_INSTALL: "on"` dans le service `tor` → active la génération du hidden service
 - `NET_MEMPOOL_WEB_IPV4: mempool_web` → le script `restart.sh` de Tor crée `/var/lib/tor/hsv3mempool/` avec le hostname .onion
-- Ronin-UI lit l'URL .onion via `execAndGetResultFromTor({ Cmd: ["cat", "/var/lib/tor/hsv3mempool/hostname"] })`
+- Ronin-UI lit l'URL .onion via `fs.readFile("${TOR_DATA_DIR}/hsv3mempool/hostname")` (volume tor monte en lecture seule)
 
 **Détection automatique par Ronin-UI :**
 - Le dashboard cherche un container nommé `mempool_db` ou `mempool-db` via le Docker socket
@@ -412,51 +412,75 @@ Cette méthode recrée tous les containers avec les nouvelles variables/services
 
 ---
 
-## Sécurité — Containers non-root
+## Sécurité — Containers et isolation
 
 **Standard Umbrel : tous les containers en `user: "1000:1000"`** (UID/GID de l'utilisateur `umbrel`).
 
 **Problème résolu :** Docker crée les sous-dossiers de volumes en `root:root` s'ils n'existent pas. Les containers en UID 1000 ne peuvent pas y écrire → crash au démarrage.
 
-**Solution :** `exports.sh` (exécuté par Umbrel avant `docker compose up`) crée tous les dossiers avec `mkdir -p` et `chown -R 1000:1000`.
+**Solution :** `exports.sh` (exécuté par Umbrel avant `docker compose up`) crée tous les dossiers avec `mkdir -p` et `chown 1000:1000` (non-recursif pour eviter les lenteurs sur volumes volumineux comme electrs).
 
-**Images rebuildées avec UID 1000:1000 :**
-- `dojo-tor:1.23.0` — build arg `TOR_LINUX_UID=1000 TOR_LINUX_GID=1000`
-- `dojo-nodejs:1.28.2` — Dockerfile custom (`dockerfiles/Dockerfile.node`) : user `node` natif UID 1000, sans group tor séparé
-- `dojo-electrs:1.2.0` — build arg `ELECTRS_LINUX_UID=1000 ELECTRS_LINUX_GID=1000`
-- `dojo-soroban:0.4.2` — Dockerfile custom (`dockerfiles/Dockerfile.soroban`) : un seul user `soroban` UID 1000 pour Tor interne + Soroban
+**Docker socket — proxy lecture seule :**
+ronin-ui n'a plus accès direct au socket Docker. Un service `docker-proxy` (tecnativa/docker-socket-proxy) intercepte les appels et n'autorise que les opérations GET (list containers, logs, images, system df). Les opérations POST/exec sont bloquées. Les hostnames .onion sont lus directement depuis le volume tor monté en lecture seule (`/tor-data:ro`), éliminant le besoin d'exec dans le container tor.
 
-**Tor SocksPolicy :** l'image Tor originale hardcode `--SocksPolicy "accept 172.28.0.0/16"` dans `restart.sh`. Sur Umbrel (réseau différent), le container `node` ne peut pas utiliser le proxy SOCKS. Fix : `tor-restart.sh` monté en volume avec `--SocksPolicy "accept 0.0.0.0/0"`. Le fichier doit être exécutable dans Git et le `command:` utilise `bash /restart.sh` pour contourner les problèmes de permissions d'exécution.
+**Tor SocksPolicy :** restreinte à `accept 10.21.0.0/16` (réseau Umbrel) avec `reject *` — seuls les containers de l'app peuvent utiliser le proxy SOCKS.
 
 **État par container :**
 
 | Container | User | Restrictions |
 |-----------|------|-------------|
 | `tor` | 1000:1000 | — |
-| `node` | 1000:1000 | — |
+| `node` | 1000:1000 | healthcheck nc port 8080 |
 | `electrs` | 1000:1000 | — |
-| `soroban` | 1000:1000 | — |
-| `ronin-ui` | 0:0 (root) | `cap_drop: ALL`, `cap_add: CHOWN/SETUID/SETGID/DAC_OVERRIDE/FOWNER`, `no-new-privileges:true` |
-| `db` | (MariaDB interne) | — |
-| `nginx` | (nginx interne) | — |
+| `soroban` | 1000:1000 | healthcheck interne |
+| `ronin-ui` | 1000:1000 | `cap_drop: ALL`, `no-new-privileges:true`, Docker via proxy TCP |
+| `docker-proxy` | (root) | Socket Docker, POST=0 (lecture seule) |
+| `db` | (MariaDB interne) | healthcheck mariadb-admin |
+| `nginx` | (nginx interne) | healthcheck nc port 80 |
 | `explorer` | (Dockerfile USER) | — |
 | `mempool_*` | 1000:1000 | — |
 
-**Pourquoi ronin-ui reste root :** il monte `/var/run/docker.sock` pour lister les containers, lire les logs, vérifier les statuts. Le Docker socket appartient à `root:docker` (GID variable selon l'hôte). Sans root, pas d'accès au socket.
+**Séparation des secrets :**
+- `NODE_API_KEY` = `APP_SEED` (clé wallet pour pairing)
+- `NODE_ADMIN_KEY` = `APP_PASSWORD` (clé admin Dojo, distincte de l'API key)
+- `NODE_JWT_SECRET` = `APP_PASSWORD_dojo_jwt` (non deductible de l'API key)
+- `JWT_SECRET` ronin-ui = `APP_SEED_roninui_jwt_secret_pad` (distinct de Dojo)
+- DB Dojo password = `APP_PASSWORD_dojodb`
+- DB Mempool password = `APP_PASSWORD_mempooldb`
+- RSA keypair = générée au runtime par `entrypoint.sh`, unique par installation, persistée dans `/app/data/`
 
-**Commandes de rebuild des images :**
+**Images multi-arch :** toutes les 8 images custom sont buildées pour `linux/amd64` + `linux/arm64` (support Raspberry Pi).
+
+**Commandes de rebuild des images (multi-arch) :**
 ```bash
+# Créer le builder (une seule fois)
+sg docker -c "docker buildx create --name multiarch --driver docker-container --use"
+sg docker -c "docker run --privileged --rm tonistiigi/binfmt --install arm64"
+
+# Ronin-UI
+cd /home/rd/Documents/GitHub/umbrel-ronindojo/ronin-ronindojo/ronin-ui
+sg docker -c "docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/skyman21m/ronin-ui:2.6.0 --push ."
+
 # Tor
-sg docker -c "docker build --build-arg TOR_LINUX_UID=1000 --build-arg TOR_LINUX_GID=1000 -t ghcr.io/skyman21m/dojo-tor:1.23.0 /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/tor"
+sg docker -c "docker buildx build --platform linux/amd64,linux/arm64 --build-arg TOR_LINUX_UID=1000 --build-arg TOR_LINUX_GID=1000 -t ghcr.io/skyman21m/dojo-tor:1.23.0 --push /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/tor"
 
 # Node (Dockerfile custom)
-sg docker -c "docker build -f /home/rd/Documents/GitHub/umbrel-ronindojo/ronin-ronindojo/dockerfiles/Dockerfile.node -t ghcr.io/skyman21m/dojo-nodejs:1.28.2 /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo"
+sg docker -c "docker buildx build --platform linux/amd64,linux/arm64 -f /home/rd/Documents/GitHub/umbrel-ronindojo/ronin-ronindojo/dockerfiles/Dockerfile.node -t ghcr.io/skyman21m/dojo-nodejs:1.28.2 --push /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo"
 
 # Electrs
-sg docker -c "docker build --build-arg ELECTRS_LINUX_UID=1000 --build-arg ELECTRS_LINUX_GID=1000 -t ghcr.io/skyman21m/dojo-electrs:1.2.0 /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/electrs"
+sg docker -c "docker buildx build --platform linux/amd64,linux/arm64 --build-arg ELECTRS_LINUX_UID=1000 --build-arg ELECTRS_LINUX_GID=1000 -t ghcr.io/skyman21m/dojo-electrs:1.2.0 --push /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/electrs"
 
 # Soroban (Dockerfile custom)
-sg docker -c "docker build -f /home/rd/Documents/GitHub/umbrel-ronindojo/ronin-ronindojo/dockerfiles/Dockerfile.soroban -t ghcr.io/skyman21m/dojo-soroban:0.4.2 /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/soroban"
+sg docker -c "docker buildx build --platform linux/amd64,linux/arm64 -f /home/rd/Documents/GitHub/umbrel-ronindojo/ronin-ronindojo/dockerfiles/Dockerfile.soroban -t ghcr.io/skyman21m/dojo-soroban:0.4.2 --push /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/soroban"
+
+# Nginx
+sg docker -c "docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/skyman21m/dojo-nginx:1.9.0 --push /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/nginx"
+
+# Explorer
+sg docker -c "docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/skyman21m/dojo-explorer:3.5.1 --push /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/explorer"
+
+# DB (contexte = racine dojo)
+sg docker -c "docker buildx build --platform linux/amd64,linux/arm64 -f /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo/docker/my-dojo/mysql/Dockerfile -t ghcr.io/skyman21m/dojo-db:1.7.0 --push /home/rd/Documents/GitHub/ronindojo-source/dojo/dojo"
 ```
 
 ---
@@ -513,61 +537,29 @@ Docker Compose v1 utilise des underscores (`ronin-ronindojo_ronin-ui_1`), v2 des
 
 ---
 
-## Audit de sécurité — Corrections appliquées (2026-04-16)
+## Audits de sécurité
 
-Un audit de sécurité a identifié 11 failles, toutes corrigées dans un seul commit.
+Deux audits ont été réalisés sur ce projet :
 
-### CRITIQUE
+### Audit 1 — Corrections internes (2026-04-16, commit `424e2e9`)
 
-**1. Mots de passe stockés en clair → hashés avec scrypt**
-- `ronin-ui.dat` stockait le mot de passe en texte brut, comparé avec `string.Eq.equals()`
-- Le module `password.ts` (scrypt + timingSafeEqual) existait déjà mais n'était jamais utilisé
-- **Fix :** `login.ts`, `change-password.ts`, `set-password.ts` utilisent maintenant `hashPassword()` et `comparePasswords()` de `password.ts`
-- **Migration transparente :** les mots de passe legacy (plaintext) sont détectés par l'absence de `:` (format hash = `salt:hex`). Au login avec un mot de passe legacy, il est automatiquement re-hashé
-- **APP_PASSWORD** (fallback Umbrel) reste en comparaison directe car c'est un HMAC-SHA256 fourni par l'environnement, pas stocké par nous
+11 failles identifiées et corrigées : mots de passe hashés avec scrypt, CORS supprimé, cookie sameSite+httpOnly, set-password protégé par auth, rate-limiting login, regex mot de passe, credentials Mempool dérivées, token Dojo en header, garde-fou mock data.
 
-**2. CORS grand ouvert → middleware supprimé**
-- `cors()` sans options = `Access-Control-Allow-Origin: *`
-- **Fix :** middleware `cors()` supprimé de `middlewares/v2/index.ts`. Sur Umbrel, tout est same-origin (pas besoin de CORS). La protection contre les requêtes cross-origin est assurée par `sameSite: "strict"` sur le cookie de session (fix #3)
-- **Note :** `cors({ origin: false })` a été tenté mais cassait les appels API client-side (SWR) avec des erreurs 500 sur toutes les routes
+### Audit 2 — Audit externe approfondi (2026-04-16/17)
 
-**3. Cookie de session non sécurisé → sameSite + httpOnly**
-- Cookie sans `sameSite` ni `httpOnly`
-- **Fix :** `sameSite: "strict"` + `httpOnly: true` dans `session.ts`. `secure: false` reste car Umbrel = HTTP sur LAN
+Audit croisé par 3 IA (Claude Opus 4.6, ChatGPT, Grok). 29 findings, 20 corrigés, 5 skippés (justifiés), 4 reportés. Rapport complet dans `/home/rd/Documents/GitHub/audit/`.
 
-### HAUT
-
-**4. Route set-password sans auth → protégée**
-- `set-password.ts` ne vérifiait pas `isUserAuthorized(req)`, contrairement à `change-password.ts`
-- **Fix :** ajout de `isUserAuthorized(req)` dans la chaîne de validation
-
-**5. Pas de rate-limiting sur le login → lockout exponentiel**
-- Brute-force trivial sans limitation
-- **Fix :** compteur par IP dans `login.ts`. Après 5 échecs → lockout 1min, puis 2min, 4min, 8min... (max 30min). Reset au login réussi
-
-**6. Regex mot de passe trop restrictive → longueur uniquement**
-- `/^\w*$/g` n'autorisait que `[a-zA-Z0-9_]`
-- **Fix :** validation de longueur >= 8 caractères uniquement — tous les caractères spéciaux autorisés
-
-**7. Mot de passe dans l'objet session → retiré**
-- `change-password.ts` mettait `password: reqBody.newPassword` dans la session
-- **Fix :** corrigé par le fix #1 — la session contient seulement `{ isLoggedIn, username }`
-
-### MOYEN
-
-**8. Credentials Mempool hardcodées → dérivées de APP_PASSWORD**
-- `MYSQL_PASSWORD: mempool` et `MYSQL_ROOT_PASSWORD: mempooladmin` en dur dans docker-compose
-- **Fix :** remplacées par `${APP_PASSWORD}` (HMAC-SHA256 unique par installation)
-- **Note :** nécessite une réinstallation de l'app (la base Mempool est recréée)
-
-**9. Pattern shell dangereux dans sudo.ts → arguments séparés**
-- Interpolation directe `bash -c '${options.command}'` avec `shell: "/bin/bash"`
-- **Fix :** arguments passés séparément à execa (`"bash", "-c", options.command`), sans `shell`
-
-**10. Token Dojo passé en URL → header Authorization**
-- `?at=${token}` dans l'URL de pushTx (visible dans les logs)
-- **Fix :** `Authorization: Bearer ${token}` dans le header. L'API Dojo accepte les deux formats
-
-**11. Données mock en production → garde-fou au démarrage**
-- Si `USE_REAL_DATA` accidentellement `"false"`, le mot de passe mock `fakeRandomPassword` serait utilisé
-- **Fix :** `throw new Error(...)` si on détecte un container Docker (`process.env.HOSTNAME`) avec `useRealData === false`
+**Corrections critiques appliquées :**
+- Docker socket isolé via proxy lecture seule (tecnativa/docker-socket-proxy)
+- ronin-ui en non-root (1000:1000) au lieu de root
+- NODE_API_KEY et NODE_ADMIN_KEY séparés
+- JWT_SECRET Dojo non déductible de la clé API
+- RSA keypair générée au runtime (unique par installation)
+- 6 routes RoninOS mortes désactivées (sudo/shell)
+- Tor SocksPolicy restreinte au réseau Umbrel
+- CSP anti-clickjacking (frame-ancestors 'self')
+- 12 images pinnées par digest sha256
+- Rate limiting persisté sur disque
+- Mots de passe DB séparés par service
+- Healthchecks sur db, node, nginx
+- 8 images multi-arch (amd64 + arm64)
