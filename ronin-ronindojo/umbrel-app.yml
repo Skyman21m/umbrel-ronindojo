@@ -20,13 +20,13 @@ developer: RoninDojo Community
 website: https://ronindojo.io
 dependencies:
   - bitcoin
-repo: ""
-support: ""
+repo: "https://github.com/Skyman21m/umbrel-ronindojo"
+support: "https://github.com/Skyman21m/umbrel-ronindojo/issues"
 port: 8099
 gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
 deterministicPassword: true
-submitter: ""
+submitter: "Skyman21m"
 submission: ""

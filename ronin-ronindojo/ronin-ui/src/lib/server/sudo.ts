@@ -11,11 +11,10 @@ type SudoOpts = {
 export const verifyUserPassword = (password: string) =>
   taskEither.tryCatch(
     () =>
-      execa("sudo", ["--stdin", "--reset-timestamp", "echo 'login'"], {
+      execa("sudo", ["--stdin", "--reset-timestamp", "echo", "login"], {
         stdout: "inherit",
         stderr: "inherit",
         input: password,
-        shell: "/bin/bash",
       }),
     () => unauthorized("Incorrect sudo password"),
   );

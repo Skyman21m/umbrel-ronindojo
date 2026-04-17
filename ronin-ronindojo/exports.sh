@@ -12,5 +12,6 @@ fi
 # Docker would create them as root if they don't exist
 if [ -n "${APP_DATA_DIR:-}" ]; then
   mkdir -p "${APP_DATA_DIR}/data/tor" "${APP_DATA_DIR}/data/mysql" "${APP_DATA_DIR}/data/electrs" "${APP_DATA_DIR}/data/soroban" "${APP_DATA_DIR}/data/ronin-ui" "${APP_DATA_DIR}/data/mempool-db" "${APP_DATA_DIR}/data/mempool-api"
-  chown -R 1000:1000 "${APP_DATA_DIR}/data" 2>/dev/null || true
+  # Set ownership on top-level dirs only (not recursive — avoids slow chown on large volumes like electrs)
+  chown 1000:1000 "${APP_DATA_DIR}/data" "${APP_DATA_DIR}/data/tor" "${APP_DATA_DIR}/data/mysql" "${APP_DATA_DIR}/data/electrs" "${APP_DATA_DIR}/data/soroban" "${APP_DATA_DIR}/data/ronin-ui" "${APP_DATA_DIR}/data/mempool-db" "${APP_DATA_DIR}/data/mempool-api" 2>/dev/null || true
 fi
