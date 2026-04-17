@@ -37,11 +37,14 @@ ENV     SOROBAN_URL             https://github.com/Dojo-Open-Source-Project/soro
 RUN     apk --no-cache --update add ca-certificates
 RUN     apk --no-cache --update add alpine-sdk linux-headers wget
 
+ENV     SOROBAN_SHA256          8608fc823dea157c20c1099a7207e62dbdc4b743d70bf41e16dc51005272d93e
+
 RUN     set -ex && \
         mkdir -p /stage && \
         mkdir -p /src && \
         cd ~ && \
         wget -qO soroban.tar.gz "$SOROBAN_URL" && \
+        echo "$SOROBAN_SHA256  soroban.tar.gz" | sha256sum -c - && \
         tar -xzvf soroban.tar.gz -C /src --strip-components 1 && \
         rm soroban.tar.gz && \
         cd /src
